@@ -14,8 +14,8 @@ def __load_workload(path: str, source_pattern: str) -> Dict[str, str]:
     for query_file in workload_files:
         with open(query_file, "r", encoding="utf-8") as raw_query:
             lines = raw_query.readlines()
-            single_line = " ".join(line.strip() for line in lines)
-            queries[query_file.stem] = single_line
+            query = "\n".join(line.strip() for line in lines)
+            queries[query_file.stem] = query
     return queries
 
 
@@ -33,7 +33,7 @@ def load_stack_workload(path: str = "../../workloads/Stack-Queries", source_patt
     workload = dict()
     for workload_dir in stack_directory.glob("*/**"):
         for label, query in __load_workload(workload_dir, source_pattern).items():
-            workload[label] = query.replace("ILIKE", "LIKE")
+            workload[label] = query
     return workload
 
 
