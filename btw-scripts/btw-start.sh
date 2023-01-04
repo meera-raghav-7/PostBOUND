@@ -62,14 +62,14 @@ cd $ROOT
 echo ".. Starting Experiment 05 :: Figure 09 - IdxNLJ operators"
 ./btw-exp05.sh
 
-cd $ROOT
-echo ".. Preparing result files"
-
-cd $ROOT
+cd $ROOT/ues
 echo ".. Generating result figures"
+Rscript --vanilla evaluation/plots-presentation.R
+python3 postbound-eval.py  # TODO
 
 cd $ROOT
 echo ".. Creating final paper"
+# TODO
 
 cd $ORIG_ROOT
 echo ".. Done"
