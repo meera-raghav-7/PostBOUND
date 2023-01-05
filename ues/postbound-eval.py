@@ -207,7 +207,7 @@ def eval_03_idxnlj_operators(report: Report):
 
 
 def main():
-    report = Report("evaluation_report.txt")
+    report = Report("../evaluation_report.txt")
     eval_01_join_orders(report)
     eval_02_subquery_generation(report)
     eval_03_idxnlj_operators(report)
