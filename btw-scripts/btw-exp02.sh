@@ -13,7 +13,7 @@ ROOT=$(pwd)
 
 cd $ROOT/postgres
 echo "... Setting up Postgres v14 environment"
-. ./postgres-start.sh
+. ./postgres-start.sh --force
 
 cd $ROOT
 echo "... Loading IMDB dataset"
@@ -41,7 +41,7 @@ dropdb imdb
 
 cd $ROOT/postgres_12_4
 echo "... Setting up Postgres v12 environment"
-. ./postgres-start.sh
+. ./postgres-start.sh --force
 
 cd $ROOT
 echo "... Loading IMDB dataset"
@@ -67,7 +67,7 @@ dropdb imdb
 # At this point we assume that both PG versions have been set up already, so all that is left for us is to load the actual databases
 cd $ROOT/postgres
 echo "... Setting up Postgres v14 environment"
-. ./postgres-start.sh
+. ./postgres-start.sh --force
 
 cd $ROOT
 echo "... Loading SSB dataset"
@@ -95,7 +95,7 @@ dropdb tpch
 
 cd $ROOT/postgres_12_4
 echo "... Setting up Postgres v12 environment"
-. ./postgres-start.sh
+. ./postgres-start.sh --force
 
 cd $ROOT
 echo "... Loading SSB dataset"

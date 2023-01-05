@@ -30,8 +30,7 @@ Rscript --vanilla btw-setup.R
 
 cd $ROOT/postgres
 echo ".. Setting up Postgres v14"
-./postgres-setup.sh
-./postgres-stop.sh
+./postgres-setup.sh --stop
 ./postgres-psycopg-setup.sh job imdb
 ./postgres-psycopg-setup.sh stack stack_dummy
 ./postgres-psycopg-setup.sh tpch tpch
@@ -39,8 +38,7 @@ mv .psycopg_connection_* $ROOT/ues
 
 cd $ROOT/postgres_12_4
 echo ".. Setting up Postgres v12"
-./postgres-setup.sh
-./postgres-stop.sh
+./postgres-setup.sh --stop
 
 cd $ROOT
 echo ".. Starting Experiment 01 :: Figure 01 - UES overestimation"

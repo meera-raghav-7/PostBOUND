@@ -8,7 +8,7 @@ ROOT=$(pwd)
 
 cd $ROOT/postgres
 echo "... Setting up Postgres v14 environment"
-. ./postgres-start.sh
+. ./postgres-start.sh --force
 
 cd $ROOT
 echo "... Loading IMDB dataset"
