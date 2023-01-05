@@ -1,0 +1,75 @@
+=== Results for Table 01 - Total runtimes of different benchmarks using different PostgreSQL versions
+workload  optimizer  postgres_version
+JOB       UES        12.4                399.502253
+                     14.2                376.990205
+          native     12.4                535.166116
+                     14.2                359.384317
+SSB       UES        12.4                  5.545183
+                     14.2                  5.311661
+          native     12.4                  5.074911
+                     14.2                  5.062522
+Name: execution_time, dtype: float64
+
+
+=== Results for Figure 07 - Subquery Generation
+Query with largest performance improvement: 6c
+Runtime [s] without subqueries: 5.693082
+Runtime [s] with subqueries: 3.765851
+
+Linear execution plan:
+Hash Join (n.id = ci.person_id) (5.688s)
+  <- Seq Scan :: name (0.264s)
+  <- Hash Join (ci.movie_id = t.id) (3.429s)
+    <- Seq Scan :: cast_info (1.392s)
+    <- Hash Join (t.id = mk.movie_id) (0.516s)
+      <- Seq Scan :: title (0.154s)
+      <- Hash Join (mk.keyword_id = k.id) (0.346s)
+        <- Seq Scan :: movie_keyword (0.162s)
+        <- Seq Scan :: keyword (0.006s)
+
+Execution plan with subqueries:
+Hash Join (ci.movie_id = t.id) (3.761s)
+  <- Hash Join (ci.person_id = n.id) (3.245s)
+    <- Seq Scan :: cast_info (1.472s)
+    <- Seq Scan :: name (0.265s)
+  <- Hash Join (t.id = mk.movie_id) (0.516s)
+    <- Seq Scan :: title (0.155s)
+    <- Hash Join (mk.keyword_id = k.id) (0.344s)
+      <- Seq Scan :: movie_keyword (0.161s)
+      <- Seq Scan :: keyword (0.006s)
+
+
+=== Results for Figure 09 - IdxNLJ operator selection
+Query with largest performance improvement: 8d
+Runtime [s] with HashJoin: 5.662634
+Runtime [s] with IdxNLJ: 2.561775
+
+Execution plan with HashJoin only:
+Hash Join (mc.company_id = cn.id) (5.520s)
+  <- Hash Join (mc.movie_id = ci.movie_id) (5.435s)
+    <- Seq Scan :: movie_companies (0.163s)
+    <- Hash Join (ci.person_id = an1.person_id) (4.850s)
+      <- Hash Join (ci.movie_id = t.id) (3.844s)
+        <- Hash Join (ci.role_id = rt.id) (3.288s)
+          <- Seq Scan :: cast_info (1.472s)
+          <- Seq Scan :: role_type (0.000s)
+        <- Seq Scan :: title (0.169s)
+      <- Hash Join (an1.person_id = n1.id) (0.861s)
+        <- Seq Scan :: aka_name (0.047s)
+        <- Seq Scan :: name (0.225s)
+  <- Seq Scan :: company_name (0.015s)
+
+Execution plan with IdxNLJ:
+Hash Join (mc.company_id = cn.id) (2.445s)
+  <- Hash Join (mc.movie_id = ci.movie_id) (2.358s)
+    <- Seq Scan :: movie_companies (0.168s)
+    <- Hash Join (ci.person_id = an1.person_id) (1.764s)
+      <- Hash Join (t.id = ci.movie_id) (0.746s)
+        <- Seq Scan :: title (0.174s)
+        <- Nested Loop (ci.role_id = rt.id) (0.124s)
+          <- Seq Scan :: role_type (0.000s)
+          <- Index Scan :: cast_info (0.080s)
+      <- Hash Join (an1.person_id = n1.id) (0.869s)
+        <- Seq Scan :: aka_name (0.047s)
+        <- Seq Scan :: name (0.224s)
+  <- Seq Scan :: company_name (0.015s)
