@@ -10,8 +10,10 @@ fi
 
 echo ".. Setting up environment"
 echo ".. Target directory is $TARGET_DIR"
-
-git clone --recurse-submodules --branch btw23-reproducibility --depth 1 https://github.com/rbergm/PostBOUND.git $TARGET_DIR
+git clone --recurse-submodules --branch btw23-reproducibility --depth 1 https://github.com/rbergm/PostBOUND.git temp
+mv temp/* $TARGET_DIR
+mv temp/.git* $TARGET_DIR
+rm -r temp
 
 echo "... Preparing directory structure"
 cd $ORIG_ROOT/$TARGET_DIR
@@ -67,7 +69,7 @@ python3 postbound-eval.py  # TODO
 
 cd $ROOT
 echo ".. Creating final paper"
-# TODO
+./btw-tex.sh
 
 cd $ORIG_ROOT
 echo ".. Done"
