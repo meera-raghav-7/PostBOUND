@@ -1,6 +1,7 @@
 #!/bin/bash
 
 ROOT=$(pwd)
+mkdir -p results
 
 echo "... Preparing LaTex env"
 cp $ROOT/BTW23-PostBOUND/table-01-tex $ROOT/tex-sources/
@@ -9,7 +10,7 @@ cp $ROOT/BTW23-PostBOUND/evaluation_report.txt $ROOT/results/
 
 
 cd $ROOT/tex-sources
-echo "... Compiling LaTex file"
+echo "... Compiling LaTeX file"
 latex -interaction=batchmode main.tex
 bibtex main
 latex -interaction=batchmode main.tex
