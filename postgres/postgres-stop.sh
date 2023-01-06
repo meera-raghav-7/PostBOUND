@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 echo ".. Stopping Postgres Server"
 . ./postgres-load-env.sh
