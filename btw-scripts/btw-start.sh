@@ -16,8 +16,8 @@ mv temp/.git* $TARGET_DIR
 rm -r temp
 
 echo "... Preparing directory structure"
-cd $ORIG_ROOT/$TARGET_DIR
-ROOT=$(pwd)
+ROOT=$ORIG_ROOT/$TARGET_DIR
+cd $ROOT
 mv $ORIG_ROOT/btw-exp*.sh .
 mv $ORIG_ROOT/btw-setup.R .
 
