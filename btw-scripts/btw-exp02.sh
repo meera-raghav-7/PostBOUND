@@ -13,7 +13,7 @@ ROOT=$(pwd)
 
 cd $ROOT/postgres
 echo "... Setting up Postgres v14 environment"
-. ./postgres-start.sh --force
+. ./postgres-start.sh
 
 cd $ROOT
 echo "... Loading IMDB dataset"
@@ -37,11 +37,11 @@ echo "... Running UES workload for JOB, PG v14"
 cd $ROOT/postgres
 echo "... Cleaning up Postgres v14 environment"
 dropdb imdb
-./postgres-stop.sh
+. ./postgres-stop.sh
 
 cd $ROOT/postgres_12_4
 echo "... Setting up Postgres v12 environment"
-. ./postgres-start.sh --force
+. ./postgres-start.sh
 
 cd $ROOT
 echo "... Loading IMDB dataset"
@@ -57,7 +57,7 @@ echo "... Running UES workload for JOB, PG v14"
 cd $ROOT/postgres_12_4
 echo "... Cleaning up Postgres v12 environment"
 dropdb imdb
-./postgres-stop.sh
+. ./postgres-stop.sh
 
 
 # ======================
@@ -67,7 +67,7 @@ dropdb imdb
 # At this point we assume that both PG versions have been set up already, so all that is left for us is to load the actual databases
 cd $ROOT/postgres
 echo "... Setting up Postgres v14 environment"
-. ./postgres-start.sh --force
+. ./postgres-start.sh
 
 cd $ROOT
 echo "... Loading SSB dataset"
@@ -91,11 +91,11 @@ echo "... Running UES workload for SSB, PG v14"
 cd $ROOT/postgres
 echo "... Cleaning up Postgres v14 environment"
 dropdb tpch
-./postgres-stop.sh
+. ./postgres-stop.sh
 
 cd $ROOT/postgres_12_4
 echo "... Setting up Postgres v12 environment"
-. ./postgres-start.sh --force
+. ./postgres-start.sh
 
 cd $ROOT
 echo "... Loading SSB dataset"
@@ -111,7 +111,7 @@ echo "... Running UES workload for JOB, PG v14"
 cd $ROOT/postgres_12_4
 echo "... Cleaning up Postgres v12 environment"
 dropdb tpch
-./postgres-stop.sh
+. ./postgres-stop.sh
 
 cd $ROOT
 echo "... Experiment done"

@@ -8,7 +8,7 @@ ROOT=$(pwd)
 
 cd $ROOT/postgres
 echo "... Setting up Postgres environment"
-. ./postgres-start.sh --force
+. ./postgres-start.sh
 
 cd $ROOT/ues
 echo "... Generating workloads for the cautious bound"
@@ -53,7 +53,7 @@ done
 
 cd $ROOT/postgres
 echo "... Cleaning up"
-./postgres-stop.sh
+. ./postgres-stop.sh
 
 cd $ROOT
 echo "... Experiment done"

@@ -8,7 +8,7 @@ ROOT=$(pwd)
 
 cd $ROOT/postgres
 echo "... Setting up Postgres v14 environment"
-. ./postgres-start.sh --force
+. ./postgres-start.sh
 
 cd $ROOT
 echo "... Loading IMDB dataset"
@@ -20,10 +20,10 @@ echo "... Generating UES queries"
 ./ues-generator.py --pattern "*.sql" --generate-labels --out workloads/job-ues-workload-base.csv ../workloads/JOB-Queries/implicit
 # the true cardinalities to compare to are static by nature. They are shipped in a separate CSV file in the Git repository
 
-cd $ROOT
+cd $ROOT/postgres
 echo "... Cleaning up"
 dropdb imdb
-postgres/postgres-stop.sh
+. ./postgres-stop.sh
 
 cd $ROOT
 echo "... Experiment done"
