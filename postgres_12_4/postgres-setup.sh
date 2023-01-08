@@ -24,7 +24,7 @@ echo "... Creating user database for $USER"
 createdb $USER
 
 if [ "$1" = "--stop" ] ; then
-    pg_ctl -D $(pwd)/postgres-server/data stop
+    pg_ctl -D $(pwd)/data stop
     echo ".. Setup done"
 else
     echo ".. Setup done, ready to connect"
