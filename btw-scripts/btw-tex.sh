@@ -1,13 +1,11 @@
 #!/bin/bash
 
 ROOT=$(pwd)
-mkdir -p results
+mkdir -p $ROOT/results/raw
 
 echo "... Preparing LaTex env"
 cp $ROOT/BTW23-PostBOUND/table-01-tex $ROOT/tex-sources/
 cp $ROOT/BTW23-PostBOUND/ues/evaluation/*.pdf $ROOT/tex-sources/figures/
-cp $ROOT/BTW23-PostBOUND/evaluation_report.txt $ROOT/results/
-
 
 cd $ROOT/tex-sources
 echo "... Compiling LaTeX file"
@@ -16,7 +14,12 @@ bibtex main
 latex -interaction=batchmode main.tex
 latex -interaction=batchmode main.tex
 pdflatex -interaction=batchmode main.tex
-cp main.pdf $ROOT/results/paper.pdf
+
+echo "... Exporting results"
+cp $ROOT/evaluation_report.txt $ROOT/results/
+cp $ROOT/tex-sources/main.pdf $ROOT/results/paper.pdf
+cp $ROOT/ues/workloads/*.csv $ROOT/results/raw/
+cp $ROOT/ues/workloads/topk-settings/*.csv $ROOT/results/raw
 
 cd $ROOT
 echo "... Done"

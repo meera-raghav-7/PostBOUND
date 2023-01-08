@@ -65,7 +65,7 @@ echo ".. Starting Experiment 05 :: Figure 09 - IdxNLJ operators"
 cd $ROOT/ues
 echo ".. Generating result figures"
 Rscript --vanilla evaluation/plots-presentation.R
-python3 postbound-eval.py  # TODO
+python3 postbound-eval.py
 
 cd $ROOT
 echo ".. Creating final paper"
