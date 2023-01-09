@@ -1,19 +1,18 @@
 #!/bin/bash
 
 ORIG_ROOT=$(pwd)
+TARGET_DIR="BTW23-PostBOUND"
 
-if [ -n "$1" ]; then
-    TARGET_DIR="$1"
+if [ -d $TARGET_DIR ] ; then
+    echo ".. Base environment exists"
 else
-    TARGET_DIR="BTW23-PostBOUND"
+    echo ".. Setting up environment"
+    echo ".. Target directory is $TARGET_DIR"
+    git clone --recurse-submodules --branch btw23-reproducibility --depth 1 https://github.com/rbergm/PostBOUND.git temp
+    mv temp/* $TARGET_DIR
+    mv temp/.git* $TARGET_DIR
+    rm -r temp
 fi
-
-echo ".. Setting up environment"
-echo ".. Target directory is $TARGET_DIR"
-git clone --recurse-submodules --branch btw23-reproducibility --depth 1 https://github.com/rbergm/PostBOUND.git temp
-mv temp/* $TARGET_DIR
-mv temp/.git* $TARGET_DIR
-rm -r temp
 
 echo "... Preparing directory structure"
 ROOT=$ORIG_ROOT/$TARGET_DIR
