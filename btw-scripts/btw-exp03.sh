@@ -12,6 +12,7 @@ echo "... Setting up Postgres environment"
 
 cd $ROOT/ues
 echo "... Generating UES workload with subqueries"
+./set-workload.sh job
 ./ues-generator.py --pattern "*.sql" --generate-labels --out-col query --join-paths --timing \
     --table-estimation precise \
     --join-estimation topk-approx --topk-length 20 \
@@ -38,9 +39,6 @@ echo "... Running linear UES workload"
     --query-mod analyze --experiment-mode ues \
     --out workloads/topk-setups/job-ues-results-topk-20-approx-linear.csv \
     workloads/topk-setups/job-ues-workload-topk-20-approx-linear.csv
-
-echo "... Gathering results"
-# TODO: how/what should we do here exactly?
 
 cd $ROOT/postgres
 echo "... Cleaning up"

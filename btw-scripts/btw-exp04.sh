@@ -12,6 +12,7 @@ echo "... Setting up Postgres environment"
 
 cd $ROOT/ues
 echo "... Generating workloads for the cautious bound"
+./set-workload.sh job
 TOPKSETTINGS=(1 2 3 4 5)
 for topk in ${TOPKSETTINGS[*]}; do
     ./ues-generator.py --pattern "*.sql" --timing --generate-labels --join-paths \

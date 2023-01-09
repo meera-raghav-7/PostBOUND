@@ -12,6 +12,7 @@ echo "... Setting up Postgres environment"
 
 cd $ROOT/ues
 echo "... Generating IdxNLJ hints for basic UES workload"
+./set-workload.sh job
 ./query-hinting.py --mode ues-idxnlj --out workloads/job-ues-workload-idxnlj.csv workloads/job-ues-workload-base.csv
 
 echo "... Running IdxNLJ workload"
