@@ -22,7 +22,7 @@ echo "... Generating IdxNLJ hints for basic UES workload"
 echo "... Running IdxNLJ workload"
 ./experiment-runner.py --csv --csv-col query --per-query-repetitions 3 \
         --experiment-mode ues --query-mod analyze \
-        --hint-col hint
+        --hint-col hint \
         --out workloads/topk-setups/job-ues-results-idxnlj.csv \
         workloads/job-ues-workload-idxnlj.csv
 
