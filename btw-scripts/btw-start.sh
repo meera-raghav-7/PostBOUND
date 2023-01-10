@@ -3,6 +3,8 @@
 ORIG_ROOT=$(pwd)
 TARGET_DIR="BTW23-PostBOUND"
 
+echo ".. Starting pipeline on $(date)"
+
 if [ -d $TARGET_DIR ] ; then
     echo ".. Base environment exists"
 else
@@ -14,7 +16,7 @@ else
     rm -r temp
 fi
 
-echo "... Preparing directory structure"
+echo ".. Preparing directory structure"
 ROOT=$ORIG_ROOT/$TARGET_DIR
 cd $ROOT
 mv $ORIG_ROOT/btw-exp*.sh .
@@ -71,4 +73,4 @@ echo ".. Creating final paper"
 ./btw-tex.sh
 
 cd $ORIG_ROOT
-echo ".. Done"
+echo ".. Done on $(date)"
