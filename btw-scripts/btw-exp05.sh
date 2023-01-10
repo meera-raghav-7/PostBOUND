@@ -10,6 +10,10 @@ cd $ROOT/postgres
 echo "... Setting up Postgres environment"
 . ./postgres-start.sh
 
+cd $ROOT
+echo "... Loading IMDB dataset"
+util/setup-job.sh
+
 cd $ROOT/ues
 echo "... Generating IdxNLJ hints for basic UES workload"
 ./set-workload.sh job
