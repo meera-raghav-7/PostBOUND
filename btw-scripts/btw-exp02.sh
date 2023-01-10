@@ -29,7 +29,7 @@ $ROOT/util/generate-workload.py --pattern "*.sql" --generate-labels \
 
 echo "... Running native workload for JOB, PG v14"
 ./experiment-runner.py --csv --per-query-repetitions 3 \
-    --query-mod analyze --pg-param "SET enable_nestloop = 'off';" \
+    --query-mod analyze --pg-param "SET enable_nestloop = 'off';" --pg-param "SET enable_memoize = 'off';" \
     --out workloads/job-results-implicit.csv \
     workloads/job-workload-implicit.csv
 
@@ -65,9 +65,9 @@ echo "... Running native workload for JOB, PG v12"
     --out workloads/job-results-implicit-pg12_4.csv \
     workloads/job-workload-implicit.csv
 
-echo "... Running UES workload for JOB, PG v14"
+echo "... Running UES workload for JOB, PG v12"
 ./experiment-runner.py --csv --per-query-repetitions 3 \
-    --query-mod analyze --experiment-mode ues \
+    --query-mod analyze --pg-param "SET enable_nestloop = 'off';" --pg-param "SET join_collapse_limit = 1;" \
     --out workloads/job-ues-results-base-pg12_4.csv \
     workloads/job-ues-workload-base.csv
 
@@ -100,7 +100,7 @@ $ROOT/util/generate-workload.py --pattern "*.sql" --generate-labels \
 
 echo "... Running native workload for SSB, PG v14"
 ./experiment-runner.py --csv --per-query-repetitions 3 \
-    --query-mod analyze --pg-param "SET enable_nestloop = 'off';" \
+    --query-mod analyze --pg-param "SET enable_nestloop = 'off';" --pg-param "SET enable_memoize = 'off';" \
     --out workloads/ssb-results-implicit.csv \
     workloads/ssb-workload-implicit.csv
 
@@ -136,9 +136,9 @@ echo "... Running native workload for SSB, PG v12"
     --out workloads/ssb-results-implicit-pg12_4.csv \
     workloads/ssb-workload-implicit.csv
 
-echo "... Running UES workload for JOB, PG v14"
+echo "... Running UES workload for JOB, PG v12"
 ./experiment-runner.py --csv --per-query-repetitions 3 \
-    --query-mod analyze --experiment-mode ues \
+    --query-mod analyze --pg-param "SET enable_nestloop = 'off';" --pg-param "SET join_collapse_limit = 1;" \
     --out workloads/ssb-ues-results-base-pg12_4.csv \
     workloads/ssb-ues-workload-base.csv
 
