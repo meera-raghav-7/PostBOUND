@@ -15,8 +15,10 @@ echo "... Loading IMDB dataset"
 util/setup-job.sh
 
 cd $ROOT/ues
-echo "... Generating workloads for the cautious bound"
 ./set-workload.sh job
+mkdir -p $ROOT/ues/workloads/topk-setups
+
+echo "... Generating workloads for the cautious bound"
 TOPKSETTINGS=(1 2 3 4 5)
 for topk in ${TOPKSETTINGS[*]}; do
     ./ues-generator.py --pattern "*.sql" --timing --generate-labels --join-paths \

@@ -15,8 +15,10 @@ echo "... Loading IMDB dataset"
 util/setup-job.sh
 
 cd $ROOT/ues
-echo "... Generating UES workload with subqueries"
 ./set-workload.sh job
+mkdir -p $ROOT/ues/workloads
+
+echo "... Generating UES workload with subqueries"
 ./ues-generator.py --pattern "*.sql" --generate-labels --out-col query --join-paths --timing \
     --table-estimation precise \
     --join-estimation topk-approx --topk-length 20 \

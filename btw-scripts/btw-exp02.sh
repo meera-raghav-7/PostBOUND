@@ -21,6 +21,7 @@ util/setup-job.sh
 
 cd $ROOT/ues
 ./set-workload.sh job
+mkdir -p $ROOT/ues/workloads
 
 echo "... Generating native query workload for JOB"
 $ROOT/util/generate-workload.py --pattern "*.sql" --generate-labels \
