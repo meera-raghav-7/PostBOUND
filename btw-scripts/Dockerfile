@@ -5,7 +5,7 @@ FROM ubuntu:focal
 ARG user
 
 ENV TZ=Europe/Berlin DEBIAN_FRONTEND=noninteractive
-RUN apt update && apt install -y build-essential bison flex git python3 python3-venv r-base texlive curl vim
+RUN apt update && apt install -y build-essential bison flex git python3 python3-venv r-base texlive curl wget vim
 
 WORKDIR /postbound-btw23
 
