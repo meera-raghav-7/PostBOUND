@@ -126,9 +126,9 @@ cd $ROOT/postgres_12_4
 echo "... Setting up Postgres v12 environment"
 . ./postgres-start.sh
 
-cd $ROOT
+cd $ROOT/util
 echo "... Loading SSB dataset"
-util/setup-ssb.sh
+./setup-ssb.sh
 
 cd $ROOT/ues
 echo "... Running native workload for SSB, PG v12"
