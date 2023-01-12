@@ -20,6 +20,34 @@ _T = typing.TypeVar("_T")
 DEFAULT_TOPK_LENGTH = 15
 
 
+class UnsupportedUESQueryError(RuntimeError):
+    def __init__(self, query: mosp.MospQuery, message: str = ""):
+        message = message if message else f"Query {query} cannot be optimized by UES"
+        self.query = query
+        super().__init__(message)
+
+
+def assert_ues_optimizable(query: mosp.MospQuery) -> None:
+    # ensure there are no subqueries in the FROM clause - these correspond to "hidden" joins
+    def _assert_no_subqueries(predicate):
+        if not predicate:
+            return True
+        if isinstance(predicate, dict):
+            if "select" in predicate:
+                return False
+            return _assert_no_subqueries(util.dict_value(predicate))
+        if isinstance(predicate, list):
+            return all(_assert_no_subqueries(sub_pred) for sub_pred in predicate)
+        return True
+
+    max_query_len = 128
+
+    if not _assert_no_subqueries(query.query["where"]):
+        query_str = str(query)
+        query = query_str[:max_query_len] + "..." if len(query_str) > max_query_len + 3 else query_str
+        raise UnsupportedUESQueryError(query, f"Query '{query}' contains subqueries in the WHERE clause")
+
+
 class MospQueryPreparation:
     """Removes unsupported structures from an incoming query and reconstructs the query after optimization.
 
@@ -64,7 +92,8 @@ class MospQueryPreparation:
         """
         reconstructed_query = dict(optimized_query.query)
 
-        reconstructed_query["select"] = copy.copy(self._original_query.query["select"])
+        select_key = "select_distinct" if "select_distinct" in self._original_query.query else "select"
+        reconstructed_query[select_key] = copy.copy(self._original_query.query[select_key])
         if "groupby" in self._original_query.query:
             reconstructed_query["groupby"] = copy.copy(self._original_query.query["groupby"])
         if "orderby" in self._original_query.query:
@@ -139,7 +168,8 @@ class MospQueryPreparation:
         if not self._generated_aliases:
             return query_data
 
-        original_select = copy.copy(self._original_query.query["select"])
+        select_key = "select_distinct" if "select_distinct" in self._original_query.query else "select"
+        original_select = copy.copy(self._original_query.query[select_key])
         for attribute in util.enlist(original_select):
             if "name" in attribute:
                 self._custom_attribute_names.append(attribute["name"])
@@ -162,6 +192,11 @@ class MospQueryPreparation:
         if isinstance(predicate, list):
             return [self._add_aliases_to_attributes(sub_predicate) for sub_predicate in predicate]
         elif isinstance(predicate, dict):
+            if "select" in predicate or not predicate:  # FIXME
+                # If the predicate contains a `select` key, it is actually a hidden subquery. These are
+                # The `not predicate` condition is necessary to catch corner-cases with attribute casts since they
+                # are parsed weirdly by mo_sql_parsing (e.g. as `{"date": {}}` when casting to date)
+                return predicate
             operation = util.dict_key(predicate)
             if operation == "literal":
                 return predicate
@@ -1317,10 +1352,10 @@ class _TableBoundStatistics(abc.ABC, Generic[_T]):
         self._joined_tables.add(joined_table)
 
     def base_bounds(self) -> Dict[db.TableRef, int]:
-        return {tab: bound for tab, bound in self.upper_bounds.items() if isinstance(tab, db.TableRef)}
+        return {tab: bound for (tab, bound) in self.upper_bounds.items() if isinstance(tab, db.TableRef)}
 
     def join_bounds(self) -> Dict["JoinTree", int]:
-        return {join: bound for join, bound in self.upper_bounds.items() if isinstance(join, JoinTree)}
+        return {join: bound for (join, bound) in self.upper_bounds.items() if isinstance(join, JoinTree)}
 
     def _init_base_estimates(self) -> None:
         predicate_map = self._query.predicates().filters
@@ -2246,6 +2281,7 @@ def optimize_query(query: mosp.MospQuery, *,
                    verbose: bool = False, trace: bool = False,
                    introspective: bool = False) -> Union[mosp.MospQuery, OptimizationResult]:
 
+    assert_ues_optimizable(query)
     logger = util.make_logger(verbose or trace)
 
     # if there are no joins in the query, there is nothing to do
