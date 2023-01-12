@@ -19,8 +19,9 @@ fi
 echo ".. Preparing directory structure"
 ROOT=$ORIG_ROOT/$TARGET_DIR
 cd $ROOT
-mv $ORIG_ROOT/btw-exp*.sh .
-mv $ORIG_ROOT/btw-setup.R .
+cp $ORIG_ROOT/btw-exp*.sh .
+cp $ORIG_ROOT/btw-setup.R .
+cp $ORIG_ROOT/btw-tex.sh .
 
 echo ".. Setting up Python venv"
 python3 -m venv postbound-venv
