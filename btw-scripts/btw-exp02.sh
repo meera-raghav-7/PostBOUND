@@ -89,7 +89,7 @@ echo "... Setting up Postgres v14 environment"
 
 cd $ROOT/util
 echo "... Loading SSB dataset"
-./setup-ssb.sh
+./setup-ssb.sh 1
 
 cd $ROOT/ues
 ./set-workload.sh ssb
@@ -128,7 +128,7 @@ echo "... Setting up Postgres v12 environment"
 
 cd $ROOT/util
 echo "... Loading SSB dataset"
-./setup-ssb.sh
+./setup-ssb.sh 1
 
 cd $ROOT/ues
 echo "... Running native workload for SSB, PG v12"
