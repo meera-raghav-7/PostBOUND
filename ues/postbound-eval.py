@@ -88,7 +88,7 @@ def read_workload(path: str, workload: str, optimization: str, pg_ver: Any) -> p
 def eval_01_join_orders(report: Report):
     job_ues_pg14 = read_workload("workloads/job-ues-results-base.csv", "JOB", "UES", 14.2)
     job_ues_pg12 = read_workload("workloads/job-ues-results-base-pg12_4.csv", "JOB", "UES", 12.4)
-    job_nat_pg14 = read_workload("workloads/job-results-implicit-nonlj.csv", "JOB", "native", 14.2)
+    job_nat_pg14 = read_workload("workloads/job-results-implicit.csv", "JOB", "native", 14.2)
     job_nat_pg12 = read_workload("workloads/job-results-implicit-pg12_4.csv", "JOB", "native", 12.4)
 
     ssb_ues_pg14 = read_workload("workloads/ssb-ues-results-base.csv", "SSB", "UES", 14.2)

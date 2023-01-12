@@ -16,7 +16,7 @@ util/setup-job.sh
 
 cd $ROOT/ues
 ./set-workload.sh job
-mkdir -p $ROOT/ues/workloads
+mkdir -p $ROOT/ues/workloads/topk-setups
 
 echo "... Generating UES workload with subqueries"
 ./ues-generator.py --pattern "*.sql" --generate-labels --out-col query --join-paths --timing \

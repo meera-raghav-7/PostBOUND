@@ -87,9 +87,9 @@ cd $ROOT/postgres
 echo "... Setting up Postgres v14 environment"
 . ./postgres-start.sh
 
-cd $ROOT
+cd $ROOT/util
 echo "... Loading SSB dataset"
-util/setup-ssb.sh
+./setup-ssb.sh
 
 cd $ROOT/ues
 ./set-workload.sh ssb
