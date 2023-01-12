@@ -46,10 +46,6 @@ echo "... Running linear UES workload"
     --out workloads/topk-setups/job-ues-results-topk-20-approx-linear.csv \
     workloads/topk-setups/job-ues-workload-topk-20-approx-linear.csv
 
-cd $ROOT/ues
-echo "... Generating result files"
-python3 evaluation/aggregate-topk-results.py
-
 cd $ROOT/postgres
 echo "... Cleaning up"
 . ./postgres-stop.sh
