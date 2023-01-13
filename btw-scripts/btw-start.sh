@@ -3,6 +3,10 @@
 ORIG_ROOT=$(pwd)
 TARGET_DIR="BTW23-PostBOUND"
 
+# debug switches
+export RESET_DATABASES="false"
+export QUERY_REPETITIONS=1
+
 echo ".. Starting pipeline on $(date)"
 
 if [ -d $TARGET_DIR ] ; then

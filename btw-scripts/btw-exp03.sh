@@ -35,13 +35,13 @@ echo "... Generating linear UES workload"
     $ROOT/workloads/JOB-Queries/implicit
 
 echo "... Running UES workload with subqueries"
-./experiment-runner.py --csv --per-query-repetitions 3 \
+./experiment-runner.py --csv --per-query-repetitions $QUERY_REPETITIONS \
     --query-mod analyze --experiment-mode ues \
     --out workloads/topk-setups/job-ues-results-topk-20-approx-smart.csv \
     workloads/topk-setups/job-ues-workload-topk-20-approx-smart.csv
 
 echo "... Running linear UES workload"
-./experiment-runner.py --csv --per-query-repetitions 3 \
+./experiment-runner.py --csv --per-query-repetitions $QUERY_REPETITIONS \
     --query-mod analyze --experiment-mode ues \
     --out workloads/topk-setups/job-ues-results-topk-20-approx-linear.csv \
     workloads/topk-setups/job-ues-workload-topk-20-approx-linear.csv

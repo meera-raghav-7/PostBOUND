@@ -5,6 +5,12 @@
 # Requires: IMDB/JOB
 
 ROOT=$(pwd)
+APPROX_TOPK_SETTINGS=(1 2 3 4 5 10 20 50 100 500)
+CAUTIOUS_TOPK_SETTINGS=(1 2 3 4 5)
+
+#TEMP
+APPROX_TOPK_SETTINGS=(1 2)
+CAUTIOUS_TOPK_SETTINGS(1 2)
 
 cd $ROOT/postgres
 echo "... Setting up Postgres environment"
@@ -19,8 +25,7 @@ cd $ROOT/ues
 mkdir -p $ROOT/ues/workloads/topk-setups
 
 echo "... Generating workloads for the cautious bound"
-TOPKSETTINGS=(1 2 3 4 5)
-for topk in ${TOPKSETTINGS[*]}; do
+for topk in ${CAUTIOUS_TOPK_SETTINGS[*]}; do
     ./ues-generator.py --pattern "*.sql" --timing --generate-labels --join-paths \
         --table-estimation precise \
         --join-estimation topk --topk-length $topk \
@@ -30,8 +35,7 @@ for topk in ${TOPKSETTINGS[*]}; do
 done
 
 echo "... Generating workloads for the approximate bound"
-TOPKSETTINGS=(1 2 3 4 5 10 20 50 100 500)
-for topk in ${TOPKSETTINGS[*]}; do
+for topk in ${APPROX_TOPK_SETTINGS[*]}; do
     ./ues-generator.py --pattern "*.sql" --timing --generate-labels --join-paths \
         --table-estimation precise \
         --join-estimation topk-approx --topk-length $topk \
@@ -41,18 +45,16 @@ for topk in ${TOPKSETTINGS[*]}; do
 done
 
 echo "... Running workloads for the cautious bound"
-TOPKSETTINGS=(1 2 3 4 5)
-for topk in ${TOPKSETTINGS[*]}; do
-    ./experiment-runner.py --csv --csv-col query --per-query-repetitions 3 \
+for topk in ${CAUTIOUS_TOPK_SETTINGS[*]}; do
+    ./experiment-runner.py --csv --csv-col query --per-query-repetitions $QUERY_REPETITIONS \
         --experiment-mode ues --query-mod analyze \
         --out workloads/topk-setups/job-ues-results-topk-$topk-smart.csv \
         workloads/topk-setups/job-ues-workload-topk-$topk-smart.csv
 done
 
 echo "... Running workloads for the approximate bound"
-TOPKSETTINGS=(1 2 3 4 5 10 20 50 100 500)
-for topk in ${TOPKSETTINGS[*]}; do
-    ./experiment-runner.py --csv --csv-col query --per-query-repetitions 3 \
+for topk in ${APPROX_TOPK_SETTINGS[*]}; do
+    ./experiment-runner.py --csv --csv-col query --per-query-repetitions $QUERY_REPETITIONS \
         --experiment-mode ues --query-mod analyze \
         --out workloads/topk-setups/job-ues-results-topk-$topk-approx-smart.csv \
         workloads/topk-setups/job-ues-workload-topk-$topk-approx-smart.csv

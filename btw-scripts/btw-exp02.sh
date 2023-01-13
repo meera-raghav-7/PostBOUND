@@ -29,7 +29,7 @@ $ROOT/util/generate-workload.py --pattern "*.sql" --generate-labels \
     $ROOT/workloads/JOB-Queries/implicit
 
 echo "... Running native workload for JOB, PG v14"
-./experiment-runner.py --csv --per-query-repetitions 3 \
+./experiment-runner.py --csv --per-query-repetitions $QUERY_REPETITIONS \
     --query-mod analyze --pg-param "SET enable_nestloop = 'off';" --pg-param "SET enable_memoize = 'off';" \
     --out workloads/job-results-implicit.csv \
     workloads/job-workload-implicit.csv
@@ -41,14 +41,16 @@ echo "... Generating UES queries for JOB"
     $ROOT/workloads/JOB-Queries/implicit
 
 echo "... Running UES workload for JOB, PG v14"
-./experiment-runner.py --csv --per-query-repetitions 3 \
+./experiment-runner.py --csv --per-query-repetitions $QUERY_REPETITIONS \
     --query-mod analyze --experiment-mode ues \
     --out workloads/job-ues-results-base.csv \
     workloads/job-ues-workload-base.csv
 
 cd $ROOT/postgres
 echo "... Cleaning up Postgres v14 environment"
-dropdb imdb
+if [ "$RESET_DATABASES" = "true" ] ; then
+    dropdb imdb
+fi
 . ./postgres-stop.sh
 
 cd $ROOT/postgres_12_4
@@ -61,20 +63,22 @@ util/setup-job.sh
 
 cd $ROOT/ues
 echo "... Running native workload for JOB, PG v12"
-./experiment-runner.py --csv --per-query-repetitions 3 \
+./experiment-runner.py --csv --per-query-repetitions $QUERY_REPETITIONS \
     --query-mod analyze --pg-param "SET enable_nestloop = 'off';" \
     --out workloads/job-results-implicit-pg12_4.csv \
     workloads/job-workload-implicit.csv
 
 echo "... Running UES workload for JOB, PG v12"
-./experiment-runner.py --csv --per-query-repetitions 3 \
+./experiment-runner.py --csv --per-query-repetitions $QUERY_REPETITIONS \
     --query-mod analyze --pg-param "SET enable_nestloop = 'off';" --pg-param "SET join_collapse_limit = 1;" \
     --out workloads/job-ues-results-base-pg12_4.csv \
     workloads/job-ues-workload-base.csv
 
 cd $ROOT/postgres_12_4
 echo "... Cleaning up Postgres v12 environment"
-dropdb imdb
+if [ "$RESET_DATABASES" = "true" ] ; then
+    dropdb imdb
+fi
 . ./postgres-stop.sh
 
 
@@ -100,7 +104,7 @@ $ROOT/util/generate-workload.py --pattern "*.sql" --generate-labels \
     $ROOT/workloads/SSB-Queries
 
 echo "... Running native workload for SSB, PG v14"
-./experiment-runner.py --csv --per-query-repetitions 3 \
+./experiment-runner.py --csv --per-query-repetitions $QUERY_REPETITIONS \
     --query-mod analyze --pg-param "SET enable_nestloop = 'off';" --pg-param "SET enable_memoize = 'off';" \
     --out workloads/ssb-results-implicit.csv \
     workloads/ssb-workload-implicit.csv
@@ -112,14 +116,16 @@ echo "... Generating UES queries for SSB"
     $ROOT/workloads/SSB-Queries
 
 echo "... Running UES workload for SSB, PG v14"
-./experiment-runner.py --csv --per-query-repetitions 3 \
+./experiment-runner.py --csv --per-query-repetitions $QUERY_REPETITIONS \
     --query-mod analyze --experiment-mode ues \
     --out workloads/ssb-ues-results-base.csv \
     workloads/ssb-ues-workload-base.csv
 
 cd $ROOT/postgres
 echo "... Cleaning up Postgres v14 environment"
-dropdb tpch
+if [ "$RESET_DATABASES" = "true" ] ; then
+    dropdb tpch
+fi
 . ./postgres-stop.sh
 
 cd $ROOT/postgres_12_4
@@ -132,20 +138,22 @@ echo "... Loading SSB dataset"
 
 cd $ROOT/ues
 echo "... Running native workload for SSB, PG v12"
-./experiment-runner.py --csv --per-query-repetitions 3 \
+./experiment-runner.py --csv --per-query-repetitions $QUERY_REPETITIONS \
     --query-mod analyze --pg-param "SET enable_nestloop = 'off';" \
     --out workloads/ssb-results-implicit-pg12_4.csv \
     workloads/ssb-workload-implicit.csv
 
 echo "... Running UES workload for JOB, PG v12"
-./experiment-runner.py --csv --per-query-repetitions 3 \
+./experiment-runner.py --csv --per-query-repetitions $QUERY_REPETITIONS \
     --query-mod analyze --pg-param "SET enable_nestloop = 'off';" --pg-param "SET join_collapse_limit = 1;" \
     --out workloads/ssb-ues-results-base-pg12_4.csv \
     workloads/ssb-ues-workload-base.csv
 
 cd $ROOT/postgres_12_4
 echo "... Cleaning up Postgres v12 environment"
-dropdb tpch
+if [ "$RESET_DATABASES" = "true" ] ; then
+    dropdb tpch
+fi
 . ./postgres-stop.sh
 
 cd $ROOT

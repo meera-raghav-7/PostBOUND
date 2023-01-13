@@ -24,7 +24,9 @@ echo "... Generating UES queries"
 
 cd $ROOT/postgres
 echo "... Cleaning up"
-dropdb imdb
+if [ "$RESET_DATABASES" = "true" ] ; then
+    dropdb imdb
+fi
 . ./postgres-stop.sh
 
 cd $ROOT
