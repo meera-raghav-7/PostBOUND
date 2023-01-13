@@ -52,7 +52,7 @@ class Report:
             output.writelines(lines)
 
 
-def read_workload(topk_length: int = np.nan, raw: str = "") -> pd.DataFrame:
+def read_workload_cautious(topk_length: int = np.nan, raw: str = "") -> pd.DataFrame:
     path = f"workloads/topk-setups/job-ues-results-topk-{topk_length}-smart.csv" if not raw else raw
     df = pd.read_csv(path)
     df = selection.best_query_repetition(df, "label", performance_col="query_rt_total")
@@ -98,9 +98,9 @@ def read_workload_approx(topk_length: int = np.nan, raw: str = "", linear: bool 
 
 def aggregate_cautious():
     job_cards = pd.read_csv("workloads/job-results-true-cards.csv", usecols=["label", "query_result"]).rename(columns={"query_result": "true_card"})
-    all_workloads = [read_workload(raw="workloads/job-ues-results-base-smart.csv")]
+    all_workloads = [read_workload_cautious(raw="workloads/job-ues-results-base-smart.csv")]
     for topk_setting in range(1, 6):
-        all_workloads.append(read_workload(topk_setting))
+        all_workloads.append(read_workload_cautious(topk_setting))
     results = pd.concat(all_workloads).reset_index().merge(job_cards, on="label")
     results["overestimation"] = (results["upper_bound"] + 1) / (results["true_card"] + 1)
     results["n_subqueries"] = results["query"].apply(lambda q: len(q.subqueries()))
@@ -113,10 +113,9 @@ def aggregate_cautious():
 
 def aggregate_approx():
     job_cards = pd.read_csv("workloads/job-results-true-cards.csv", usecols=["label", "query_result"]).rename(columns={"query_result": "true_card"})
-    all_workloads_approx = [read_workload_approx(raw="workloads/job-ues-results-base-smart.csv"), read_workload_approx(raw="workloads/job-ues-results-base-linear.csv", linear=True)]
+    all_workloads_approx = [read_workload_approx(raw="workloads/job-ues-results-base-smart.csv")]
     for topk_setting in [1, 5, 10, 20, 50, 100, 500]:
         all_workloads_approx.append(read_workload_approx(topk_setting))
-        all_workloads_approx.append(read_workload_approx(topk_setting, linear=True))
     results_approx = pd.concat(all_workloads_approx).reset_index().merge(job_cards, on="label")
     results_approx["overestimation"] = (results_approx["upper_bound"] + 1) / (results_approx["true_card"] + 1)
     results_approx["n_subqueries"] = results_approx["query"].apply(lambda q: len(q.subqueries()))
@@ -125,6 +124,7 @@ def aggregate_approx():
     results_approx["setting"] = settings_approx
     results_approx.drop(columns=["optimization_success", "ues_bounds", "query_result", "run"], inplace=True)
     return results_approx
+
 
 def write_tex_table(job_runtimes, ssb_runtimes, outfile):
     template = r"""
