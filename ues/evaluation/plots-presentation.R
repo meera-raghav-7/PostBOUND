@@ -12,6 +12,8 @@ library(ggplot2)
 library(viridis)
 library(scales, warn.conflicts = FALSE)
 
+options(readr.show_col_types = FALSE)
+
 # - - - - - - - - - - - - - - - -
 # 00: Basic setup ----
 # - - - - - - - - - - - - - - - -

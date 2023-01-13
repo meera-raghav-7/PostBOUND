@@ -26,8 +26,8 @@ cp $ORIG_ROOT/btw-tex.sh .
 echo ".. Setting up Python venv"
 python3 -m venv postbound-venv
 . postbound-venv/bin/activate
-pip install wheel
-pip install -r requirements.txt
+pip install --progress-bar off wheel
+pip install --progress-bar off -r requirements.txt
 
 echo ".. Setting up R environment"
 Rscript --vanilla btw-setup.R
