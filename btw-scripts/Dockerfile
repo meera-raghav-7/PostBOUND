@@ -5,7 +5,17 @@ FROM ubuntu:focal
 ARG user
 
 ENV TZ=Europe/Berlin DEBIAN_FRONTEND=noninteractive
-RUN apt update && apt install -y build-essential bison flex git python3 python3-venv r-base texlive curl wget vim
+
+# run apt installs in separate steps to enable easier repetition if one install fails
+# ubuntu's apt servers are having problems currently
+RUN apt update
+RUN apt install -y build-essential
+RUN apt install -y bison flex
+RUN apt install -y git
+RUN apt install -y python3 python3-venv
+RUN apt install -y r-base
+RUN apt install -y texlive
+RUN apt install -y curl wget vim
 
 WORKDIR /postbound-btw23
 
