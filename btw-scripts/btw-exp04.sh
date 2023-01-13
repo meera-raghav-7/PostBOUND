@@ -8,9 +8,6 @@ ROOT=$(pwd)
 APPROX_TOPK_SETTINGS=(1 2 3 4 5 10 20 50 100 500)
 CAUTIOUS_TOPK_SETTINGS=(1 2 3 4 5)
 
-#TEMP
-APPROX_TOPK_SETTINGS=(1 2)
-CAUTIOUS_TOPK_SETTINGS=(1 2)
 
 cd $ROOT/postgres
 echo "... Setting up Postgres environment"

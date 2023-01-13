@@ -4,8 +4,8 @@ ORIG_ROOT=$(pwd)
 TARGET_DIR="BTW23-PostBOUND"
 
 # debug switches
-export RESET_DATABASES="false"
-export QUERY_REPETITIONS=1
+export RESET_DATABASES="true"
+export QUERY_REPETITIONS=3
 
 echo ".. Starting pipeline on $(date)"
 
