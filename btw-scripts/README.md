@@ -12,6 +12,7 @@ will contain all results produced by the experiments (see below)
 3. start the actual experiments. This includes setting up a number of Postgres instances from scratch, creating
 different databases and query workloads
 
+
 ## Requirements
 
 It is recommended although not strictly necessary to run the Docker image on a system with at least **32 GB of RAM**.
@@ -21,7 +22,22 @@ latter. Since the experiments include repeatetly setting up instances of the IMD
 be available. Furthermore, a working **internet connection** is required, with broadband being heavily recommended.
 
 In total, the experiments will take several hours, but the total runtime should not exceed days. On our hardware (XXX),
-it took about YYY hours to execute the entire pipeline.
+it took about YYY hours to execute the entire pipeline. To put the amount of work in the pipeline into perspective,
+here is an overview of the most time-demanding steps in the pipeline:
+
+- install a number of packages using `apt`
+- install some R libraries and Python packages
+- download an image of the IMDB
+- download and compile two instances of PostgreSQL
+- load IMDB instances from CSV files for a total of 4 times [^fn-imdb]
+- execute the JOB for a total of 66 times using differently optimized queries [^fn-job]
+- compile the final LaTeX paper
+
+[^fn-imdb]: This ensures that settings using the native query optimizer encouter the same (fresh) DB state each time
+they are run. Most importantly, this prevents Postgres from optimizing the $n$-th workload iteration based on metadata
+it created during the $(n-1)$-th run.
+[^fn-job]: there are 22 distinct settings and each setting is repeated 3 times to prevent some outliers
+
 
 ## Result artifacts
 
@@ -45,6 +61,7 @@ Furthermore, all performance measurements that only appear in the text parts of 
 raw data that percentages, etc. are based on, is exported in the `raw` subfolder. Lastly, the description of the
 underlying hardware of the experiments is static as well.
 
+
 ## Repeating experiments
 
 The easiest way to rerun experiments, is by deleting the Docker image and restarting the `run.sh` script. Keep in mind,
@@ -56,9 +73,8 @@ the system has to be setup according to the steps in `btw-start.sh`. Most import
 Python virtual environment. If in doubt, take a look at the commands in the `btw-start.sh` script. To export the results
 and update the paper, etc., execute the `btw-tex.sh` script.
 
+
 ## Cleaning up
 
 Since all experiments take place in the Docker container, it is sufficient to delete both the container, as well as the
-underlying image to remove all artifacts. All scripts that are shipped with this README can be deleted without
-requiring any special steps. Just remember that in order to repeat the experiments, the `btw-*` scripts have to be
-present while the Docker container is created.
+underlying image to remove all artifacts. Afterwards, they can be re-created by running the `run.sh` script again.
