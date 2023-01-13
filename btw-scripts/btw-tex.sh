@@ -4,8 +4,8 @@ ROOT=$(pwd)
 mkdir -p $ROOT/results/raw
 
 echo "... Preparing LaTex env"
-cp $ROOT/BTW23-PostBOUND/table-01-tex $ROOT/tex-sources/
-cp $ROOT/BTW23-PostBOUND/ues/evaluation/*.pdf $ROOT/tex-sources/figures/
+cp $ROOT/table-01-tex $ROOT/tex-sources/
+cp $ROOT/ues/evaluation/*.pdf $ROOT/tex-sources/figures/
 
 cd $ROOT/tex-sources
 echo "... Compiling LaTeX file"

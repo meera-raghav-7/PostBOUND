@@ -3,7 +3,7 @@
 DOCKER_ROOT=/postbound-btw23
 USER=$(whoami)
 
-mkdir -p results
+mkdir -p results/raw
 docker build -t btw-postbound --build-arg user=$USER . | tee docker-setup.log
 docker run -dt \
     --name btw-postbound \
