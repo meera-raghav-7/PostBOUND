@@ -10,6 +10,5 @@ docker run -dt \
     --user $USER \
     btw-postbound
 
-
 docker exec -t --user $USER btw-postbound $DOCKER_ROOT/btw-start.sh | tee experiments.log
-docker container cp btw-postbound btw-postbound:$DOCKER_ROOT/BTW23-PostBOUND/results .
+docker container cp btw-postbound:$DOCKER_ROOT/BTW23-PostBOUND/results .
