@@ -11,6 +11,7 @@ echo ".. Starting pipeline on $(date)"
 
 if [ -d $TARGET_DIR ] ; then
     echo ".. Base environment exists"
+    cd $TARGET_DIR
     git pull --recurse-submodules=yes origin btw23-reproducibility
 else
     echo ".. Setting up environment"
