@@ -19,7 +19,7 @@ cd $ROOT/ues
 mkdir -p $ROOT/ues/workloads
 
 echo "... Generating UES queries"
-./ues-generator.py --pattern "*.sql" --generate-labels --out workloads/job-ues-workload-base.csv ../workloads/JOB-Queries/implicit
+./ues-generator.py --pattern "*.sql" --generate-labels --out workloads/job-ues-workload-orig.csv ../workloads/JOB-Queries/implicit
 # the true cardinalities to compare to are static by nature. They are shipped in a separate CSV file in the Git repository
 
 cd $ROOT/postgres

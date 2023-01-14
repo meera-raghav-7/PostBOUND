@@ -32,7 +32,7 @@ select_best_query_repetition <- function(result_path) {
 # 01: UES overestimation ----
 # - - - - - - - - - - - - - - - -
 true_cards <- read_csv("workloads/job-results-true-cards.csv") %>% rename(true_card = query_result) %>% select(label, true_card)
-ues_bounds <- read_csv("workloads/job-ues-workload-base.csv") %>% rename(upper_bound = ues_final_bound) %>% select(label, upper_bound)
+ues_bounds <- read_csv("workloads/job-ues-workload-orig.csv") %>% rename(upper_bound = ues_final_bound) %>% select(label, upper_bound)
 ues_overestimation <- inner_join(ues_bounds, true_cards, by = "label") %>%
   mutate(overestimation = (upper_bound+1) / (true_card+1)) %>%
   arrange(overestimation)
@@ -119,4 +119,3 @@ ggplot(topk_optimization_time, aes(x = setting, y = optimization_time, group = e
   theme_bw() +
   theme(text= element_text(size = 20), axis.text.x = element_text(angle = 25, hjust = 1))
 dev.off()
-
