@@ -38,7 +38,6 @@ echo "... Generating UES queries for JOB"
 ./ues-generator.py --pattern "*.sql" --generate-labels \
     --join-paths --timing \
     --table-estimation precise \
-    --subqueries smart \
     --out-col query --out workloads/job-ues-workload-base.csv \
     $ROOT/workloads/JOB-Queries/implicit
 
