@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Experiment 05: Bound improvements via different top-k lists
+# Experiment 05: Runtime improvements via IdxNLJ hints in subqueries
 # Requires: Postgres v14
 # Requires: IMDB/JOB
 
