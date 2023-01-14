@@ -21,8 +21,9 @@ the image should be executable on AMD-based systems as well as Intel-based archi
 latter. Since the experiments include repeatetly setting up instances of the IMDB, at least **70 GB of storage** should
 be available. Furthermore, a working **internet connection** is required, with broadband being heavily recommended.
 
-In total, the experiments will take several hours, but the total runtime should not exceed days. On our hardware (XXX),
-it took about YYY hours to execute the entire pipeline. To put the amount of work in the pipeline into perspective,
+In total, the experiments will take several hours, but the total runtime should not exceed days. On our hardware
+(Intel Xeon 6126, 92GB main memory),
+it took about 10 hours to execute the entire pipeline. To put the amount of work in the pipeline into perspective,
 here is an overview of the most time-demanding steps in the pipeline:
 
 - install a number of packages using `apt`
