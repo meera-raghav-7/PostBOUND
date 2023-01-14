@@ -21,6 +21,20 @@ cd $ROOT/ues
 ./set-workload.sh job
 mkdir -p $ROOT/ues/workloads/topk-setups
 
+echo ".. Generating base workload to compare to"
+./ues-generator.py --pattern "*.sql" --timing --generate-labels --join-paths \
+        --table-estimation precise \
+        --join-estimation basic \
+        --subqueries smart \
+        --out-col query --out workloads/job-ues-workload-base-smart.csv \
+        ../workloads/JOB-Queries/implicit
+
+echo ".. Running base workload"
+./experiment-runner.py --csv --csv-col query --per-query-repetitions $QUERY_REPETITIONS \
+        --experiment-mode ues --query-mod analyze \
+        --out workloads/job-ues-results-base-smart.csv \
+        workloads/job-ues-workload-base-smart.csv
+
 echo "... Generating workloads for the cautious bound"
 for topk in ${CAUTIOUS_TOPK_SETTINGS[*]}; do
     ./ues-generator.py --pattern "*.sql" --timing --generate-labels --join-paths \

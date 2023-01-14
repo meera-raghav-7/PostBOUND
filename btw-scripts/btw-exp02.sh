@@ -49,9 +49,7 @@ echo "... Running UES workload for JOB, PG v14"
 
 cd $ROOT/postgres
 echo "... Cleaning up Postgres v14 environment"
-if [ "$RESET_DATABASES" = "true" ] ; then
-    dropdb imdb
-fi
+# we keep the IMDB instance since this was the last time that a native workload was executed against it
 . ./postgres-stop.sh
 
 cd $ROOT/postgres_12_4
