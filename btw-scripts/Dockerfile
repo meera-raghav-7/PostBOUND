@@ -14,7 +14,7 @@ RUN apt install -y bison flex
 RUN apt install -y git
 RUN apt install -y python3 python3-venv
 RUN apt install -y r-base
-RUN apt install -y texlive
+RUN apt install -y texlive-full
 RUN apt install -y curl wget vim
 
 WORKDIR /postbound-btw23
