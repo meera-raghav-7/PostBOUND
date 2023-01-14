@@ -1,0 +1,175 @@
+# Response to the reviewer’s comments
+## PostBOUND: PostgreSQL with Upper Bound SPJ Query Optimization
+
+First and foremost, we would like to thank the three reviewers and the meta-reviewer for their thoughtful and constructive reviews. The comments and suggestions will help us in improving the paper. From our point of view, all reviewers raised four major points that we would like to answer collectively to clarify our contributions. In case of acceptance, the final version of our paper will be revised according to these points.
+
+### Evaluation Results
+Thank you for raising this point, as it is important to the contribution of our paper. We agree that the initial results may seem somewhat frustrating (see reviewer 2) for the newer version of PostgreSQL. Unfortunately, we have to admit a potential bug on our end. Driven by the comparatively different results for both PostgreSQL versions, we re-analyzed the experiments and found a mistake so that the comparison of PostgreSQL native and PostBOUND was not fair on the newer release. We fixed this bug, and the newer version of PostgreSQL now shows similar behavior as the previous versions. Thus, PostBOUND produces join orders that perform better compared to the native plans. (In particular, a similar trend can be observed across different hardware configurations and PostgreSQL releases.) To keep everything transparent, we added the respective scripts to run the experiments on our GitHub page and are happy to participate in the reproducibility program in case of acceptance. We will update the evaluation section for the final version accordingly. In addition to the pure workload execution times, we will include further detailed results for the individual queries.  This can better illustrate the advantages our approach. Moreover, we examine the aforementioned papers of reviewer 2 with respect to a possible comparison. If a comparison is possible, we will perform it and include it in the final version. Of course, that depends on whether the code is available. 
+
+### PostBOUND Contribution Details
+Thanks for bringing up the topic. PostBOUND is a standalone component written in Python but tailored to PostgreSQL. However, this component is built to replace the existing SQL frontend of PostgreSQL. With that, we are making upper bound-driven optimization of SPJ queries a first class citizen in or for PostgreSQL. Moreover, our developed PostBOUND framework provides extension points to include further approaches for upper bound concepts. Important to note, our current implementation does not support the whole spectrum of SQL with regard to SPJ queries. This has no conceptual but time-related reasons. However, we will actively drive our implementation. 
+Furthermore, there were some questions on certain partial PostBOUND aspects such as subqueries or regarding the elaborate implementation for the cautious bound strategy. These questions can be answered in a straightforward way and the answers will be integrated in the final version.
+
+### Self-Containment
+Thank you for raising this point. Since we still have 2 pages of space, we will elaborate a bit on the underlying UES description as well as the description of our approach. 
+
+### Typos
+Thank you for listing the typos. We will correct them and the final version will be checked by a native speaker.
+
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Overview of Reviews
+----------------------------------------
+
+Review 1
+========
+
+Evaluation of the Contribution
+------------------------------
+Overall Recommendation: 6
+
+
+Comments for the Authors
+------------------------
+This paper reports on the PostBOUND project which aims to bring join
+tree optimization based on upper bounds to PostgreSQL.  The goal is to
+avoid the selection of questionable (or outright disastrous) join orders
+in the face of non-uniform value distribution and/or misestimated
+selectivites and cardinalities (all of which are plain facts of
+practical RDBMS usage once non-trivial queries have to be considered).
+PostBOUND tries to operate using only basic column stats and selectivities
+for predicates over base tables, both of which are reasonable to assume
+and maintain in real RDBMSs.
+
+PostBOUND underlies restrictions (e.g., can process key/foreign key
+equi-joins only) and its effect on plan quality appears to be somewhat
+marginal (see Table 1), in particular if compared to recent PostgreSQL
+version. This is a downer in a sense, but PostBOUND's direction and idea
+still deserve to be heard at BTW, I think.
+
+There is some confusion about how tightly integrated PostBOUND is into
+PostgreSQL currently.  Page 2 introduces it as being a "first class
+citizen in PostgreSQL" while the later paper then describes as a piece
+of Python code.  Thus, how tight is the integration really? Section 3
+says that PostBOUND has to use extensions like pg_hint_plan and
+optimizer configuration variables like enable_nestloop—and, I assume,
+join_collapse_limit—which suggests that PostBOUND indeed is external to
+PostgreSQL.  (Aside: enable_nestloop is a global configuration switch
+which will disable the use of nested-loop joins in the *entire* plan —
+is this what PostBOUND indeed aims for?)
+
+Page 8: What is the rationale of the restriction that the SELECT clause
+may only contain attributes or an aggregation of attributes?  If c denotes
+a numeric column, would the scalar expression 42 + c still be acceptable
+in the SELECT clause?
+
+Page 10: In R.a = (a₁,a₂,...,aₙ), what do the aᵢ denote exactly?  Are
+the aᵢ the most frequent values in the top-k list for column R.a or do
+they denote the active domain of column R.a?
+
+Page 12: In Algorithm 1, Line 13, topk(S') should probably read top(S').
+Also, the recursive call to cautious_bound in Line 13 appears to be
+missing the last argument (the current bound).
+
+Section 5 reveals that the cautious bound strategy appears to be
+practically infeasible unless you employ the "elaborate implementation"
+mentioned at the end of Section 4.2.  Can you provide a *brief* sketch
+of that elaborate implementation at this point?
+
+Page 15: "However, introducing subqueries also implies additional
+pipeline breakers during query execution."  Is that so in the presence
+of elaborate query unnesting strategies (see Neumann's and Kemper's
+BTW 2015 paper on "unnesting everything", for example).  Are you
+referring to a deficiency in the current PostgreSQL, instead?
+
+Please consider to typeset your figures such that they can be
+interpreted on a black/white printout (this relates to the use of orange
+in Figure 4 or yellow in Figure 9, for example).  Thank you.
+
+Typos (marked like _this_):
+
+- p.2: ... approaches using guaranteed upper bounds for join cardinalities
+       _are_ a very promising alternative ...
+
+- p.3: ... on improving _long-running_ queries, instead of ...
+
+ 
+
+ 
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+Review 2
+========
+
+Evaluation of the Contribution
+------------------------------
+Overall Recommendation: 8
+
+
+Comments for the Authors
+------------------------
+The Dresden group recently developed a new idea for estimating the size of a join result based on upper bound computation. The idea is simple: for each join argument find out the largest group of equal join attribute values and assume that the entire relation consists of groups of this size. Obviously this is not a tight upper bound in practice. Here a complementary heuristic was developed.
+
+The paper does not contain really novel ideas, but describes the implementation of this previously published idea in Postgres. Additionally some experimental results based on JOB and Starschema are discussed. Somewhat frustrating (for the authors) was the fact that the newer versions of Postgres improved the query plans substantially. Therefore, their technique is marketed as a means to robustify the optimization for long tail queries.
+
+It would be interesting to compare UES to a state of the art modern DP optimizer based on work by Moerkotte, Neumann, Radke.
+
+Also they may want to include a comparison to Jignesh Patel's groups approach of dynamically reordering joins, i.e.
+
+Looking Ahead Makes Query Plans Robust
+Making the Initial Case with In-Memory Star Schema Data Warehouse Workloads
+Jianqiao Zhu ... Jignesh Patel
+
+ 
+
+ 
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+Review 3
+========
+
+Evaluation of the Contribution
+------------------------------
+Overall Recommendation: 8
+
+
+Comments for the Authors
+------------------------
+The paper presents a PostgreSQL implementation of their already published UES concept for optimising join orderings. The concept calculates upper (U) bounds using sampling-based (S) query execution to enumerate the joins (E) for an ordering.
+
+S1 The paper is well written.
+S2 The concept is implemented within PostgreSQL as an open-source database and the authors promise to publish the code for publication.
+S3 The figures are very helpful and a good fit.
+W1 Within the formulas, please use \cdot instead of * for multiplication
+W2 The source-code has not been yet published.
+W3 On page 4: I got confused by R = R_1 |><| R_2: the attributes a and b do not correlate with the values in Fig. 2, maybe use other/same names for R_1/2 and introduce the schema.
+W4 An example for the P/K joins would be helpful to better understand how they act as a filter. Consider adding the schema for each table T.
+W5 The explanation of UES in Section 2 is to brief and relies on knowledge of the previous publication. As there is still one page left, consider extending the explanation for making the paper self-contained.
+
+minor: page 8 "also also", page 9 "If the frequency were" -> was
+
+ 
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+Meta-Review 4
+=============
+
+Evaluation of the Contribution
+------------------------------
+Overall Recommendation: 8
+
+ 
+
+ 
+
+Meta-Review for the Authors
+---------------------------
+Thank you for the submission and the response letter. We are happy accept the paper. Please consider incorporating the changes as outlined in the response letter into the camera-ready version of the paper. 

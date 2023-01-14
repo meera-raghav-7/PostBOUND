@@ -2,11 +2,11 @@
 \label{sec:RealtedWork}
 
 Generally, the optimization of SPJ queries entails two major challenges: (i) finding a good join order and (ii) selecting the best-fitting physical join operator for each single join within the chosen join order. 
-According to~\cite{DBLP:conf/pods/Chaudhuri98}, to solve both challenges, state-of-the-art SPJ query optimizer require precise estimates of intermediate join result sizes (cardinalities). 
+According to~\cite{DBLP:conf/pods/Chaudhuri98}, to solve both challenges, state-of-the-art SPJ query optimizers require precise estimates of intermediate join result sizes (cardinalities). 
 Unfortunately, as shown in~\cite{DBLP:conf/icde/PerronSKS19}, ad-hoc estimation techniques are unlikely to achieve such precise estimates. 
 Additionally, Leis et al.~\cite{DBLP:journals/pvldb/LeisGMBK015} provide empirical evidence that cost-based optimizers are prone to disastrous planning decisions if precise cardinality estimates cannot be provided. 
 To tackle this issue, recent work investigates more computationally intensive sketches~\cite{DBLP:conf/sigmod/CaiBS19,DBLP:conf/sigmod/IzenovDRS21,DBLP:conf/sigmod/KipfVMKRLB0K19} or machine learning (ML) approaches~\cite{DBLP:journals/pvldb/HilprechtSKMKB20,DBLP:conf/cidr/KipfKRLBK19,DBLP:journals/pvldb/NegiMKMTKA21,DBLP:conf/sigmod/WoltmannHTHL19,DBLP:journals/pvldb/YangKLLDCS20} to achieve precise cardinality estimates. 
-Beyond cardinality estimation, some ML approach apply reinforcement learning (RL) for holistic query plan optimization~\cite{DBLP:journals/corr/abs-1808-03196,DBLP:conf/sigmod/MarcusNMTAK21,DBLP:journals/pvldb/MarcusNMZAKPT19}. 
+Beyond cardinality estimation, some ML approaches apply reinforcement learning (RL) for holistic query plan optimization~\cite{DBLP:journals/corr/abs-1808-03196,DBLP:conf/sigmod/MarcusNMTAK21,DBLP:journals/pvldb/MarcusNMZAKPT19}. 
 For example, Bao~\cite{DBLP:conf/sigmod/MarcusNMTAK21} learns and injects SQL hints to guide general planning decisions of the underlying optimizer. 
 
 An alternative approach to precise cardinality estimates is to compute an upper bound for each intermediate result. 
@@ -15,7 +15,7 @@ Atserias et al.~\cite{DBLP:conf/focs/AtseriasGM08} introduced a smart formula --
 This upper bound was improved by the \emph{polymatroid bound}, which takes into account both the cardinalities, and the degree constraints as well as including functional dependencies as a special case~\cite{DBLP:journals/jacm/GottlobLVV12,DBLP:conf/pods/KhamisNS16,DBLP:conf/pods/000118}.
 Fundamentally, an upper bound could be used by any cost-based query optimizer in lieu of precise cardinality estimates and this idea was recently pursued by the database systems community, where the upper bound appears under various names such as bound sketch, cardinality bound, or pessimistic cardinality estimator~\cite{DBLP:conf/sigmod/CaiBS19,DBLP:journals/corr/abs-2201-04166,hertzschuch-21-ues}. 
 For example, Cai et al.~\cite{DBLP:conf/sigmod/CaiBS19} introduced a pessimistic cardinality estimator, which uses Count-Min sketches for capturing join crossing correlations. 
-The sketch building process introduces significant overhead when the number of join increases.
+The sketch building process introduces significant overhead when the number of joins increases.
 In contrast to that, our UES concept~\cite{hertzschuch-21-ues} maintains the pessimistic property for cardinality estimation while replacing sketches with a simple formula based on available basic statistics (most frequent attribute values). 
 With \emph{PostBOUND}, we presented a comprehensive framework for all these upper bound approaches in PostgreSQL consisting of two separate components as described in Section~\ref{sec:PostBound}.
 Each component focuses on a single challenge for SPJ query optimization, namely finding a good join order and selecting the best-fitting physical operator.

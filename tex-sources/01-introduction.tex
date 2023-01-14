@@ -9,51 +9,49 @@ However, relying on these assumptions can lead to disastrous join orderings~\cit
 Thus, various sophisticated techniques for the join cardinality estimation have been proposed in recent years.
 On the one hand, sampling approaches seem appealing~\cite{DBLP:conf/cidr/LeisRGK017,DBLP:conf/cidr/MoerkotteH20,DBLP:conf/sigmod/ZhaoC0HY18}, but they do not scale well to many joins~\cite{DBLP:conf/sigmod/ChenY17,DBLP:conf/sigmod/ZhaoC0HY18}. 
 On the other hand, modern estimation approaches rely on machine learning techniques~\cite{DBLP:conf/cidr/KipfKRLBK19,DBLP:conf/sigmod/WoltmannHTHL19} as they are able to model complex data characteristics. 
-However, these ML approaches do not yet cover all relevant filter predicate types and their training depends on executing a plethora of joins, which may take days or weeks~\cite{DBLP:conf/sigmod/WoltmannHHL20,DBLP:conf/btw/WoltmannHHL21}.
+However, these ML approaches do not yet cover all relevant filter predicate types and their training depends on executing a plethora of joins, which may take days or even weeks~\cite{DBLP:conf/sigmod/WoltmannHHL20,DBLP:conf/btw/WoltmannHHL21}.
 
 \begin{figure}[t]
     \centering
     \includegraphics[width=0.7\linewidth]{figures/plot-ues-overestimation.pdf}
     \caption{Upper bound overestimation of UES for the Join-Order-Benchmark.}
     \label{fig:UESOverestimationJOB}
-    \vspace{-0.4cm}
 \end{figure}
 
 Thus, state-of-the-art approaches to find good join orders based on reliable cardinality estimates do not seem to be the right way.
-In contrast to that, approaches using guaranteed upper bounds for join cardinalities is a very promising alternative leading to better and more robust join ordering for complex SPJ queries~\cite{DBLP:conf/sigmod/CaiBS19,DBLP:journals/corr/abs-2201-04166,hertzschuch-21-ues}. 
+In contrast to that, approaches using guaranteed upper bounds for join cardinalities are a very promising alternative leading to better and more robust join ordering for complex SPJ queries~\cite{DBLP:conf/sigmod/CaiBS19,DBLP:journals/corr/abs-2201-04166,hertzschuch-21-ues}. 
 In that direction, we have recently introduced a novel concept called \emph{UES}~\cite{hertzschuch-21-ues}. 
-The most outstanding feature of ~\emph{UES} is its simplicity, achieved by three building blocks:
+The most outstanding feature of UES is its simplicity, achieved by three building blocks:
 \begin{compactitem}
-\item[\emph{U}-Block:] Assuming only basic attribute statistics and accurate selectivity estimates for filters over base tables, we defined a simple, yet effective \textbf{U}pper bound for an arbitrary number of joins. In particular, our \emph{UES} upper bound calculates the worst-case cardinality using only the maximum value frequency per join attribute. 
+\item[\emph{U}-Block:] Assuming only basic attribute statistics and accurate selectivity estimates for filters over base tables, we defined a simple, yet effective \textbf{U}pper bound for an arbitrary number of joins. In particular, our UES upper bound calculates the worst-case cardinality using only the maximum value frequency per join attribute. 
 \item[\emph{E}-Block:] Appropriately \textbf{E}numerating joins according to our upper bound effectively prevents overly aggressive (sometimes disastrous) join orderings.
-\item[\emph{S}-Block:] To guarantee accurate selectivity estimates even for complex filters in SPJ-queries required by the \textbf{U}-Block, we treat \textbf{S}ampling like query execution.
+\item[\emph{S}-Block:] To guarantee accurate selectivity estimates even for complex filters in SPJ-queries required by the \textbf{U}-Block, we propose using customized \textbf{S}ampling strategies. In case of less challenging filter operations, other synopsis such as standard histograms might be used.
 \end{compactitem}
 
 \textbf{Our Contributions:} 
-In this paper, we introduce \emph{PostBOUND}, our generalized framework implementation around the general \emph{UES} concept making upper bound SPJ query optimization a first class citizen in PostgreSQL. 
+In this paper, we introduce \emph{PostBOUND}, our generalized framework implementation around the general UES concept to seamlessly integrate upper bound SPJ query optimization in PostgreSQL. 
 \emph{PostBOUND} provides abstractions to integrate arbitrary upper bounds for join cardinalities, to model joins required by a query and to determine an optimized join order.
 These abstractions are supplemented by a customized version of the UES algorithm and accompanied by other assisting components such as estimation strategies for base table filters or an infrastructure for physical operator selection.
-Moreover, our overall framework is implemented in Python and it is designed for extensibility.% to advance research in this context.% through a comprehensive and extensible system.
+Our overall framework is implemented in Python with extensibility being one of the primary design goals.% to advance research in this context.% through a comprehensive and extensible system.
 
 To demonstrate this extensibility and to show ongoing research potential, we additionally introduce two tighter upper bound variant ideas as a generalization of UES. 
-Fig.~\ref{fig:UESOverestimationJOB} exemplary illustrates the overestimation factor of the UES upper bound compared to the real query results for the \emph{Join-Order-Benchmark (JOB)}~\cite{DBLP:journals/pvldb/LeisGMBK015}.
-It is clearly visible that the overestimation in the range from $10^3$ to $10^{16}$ is extreme leading to a very pessimistic approach. 
-One of the disadvantages of this high overestimation is that the determined join order for a SPJ query could be too defensive and there could be a join order providing a faster run time. 
+Fig.~\ref{fig:UESOverestimationJOB} exemplarily illustrates the overestimation factor of the UES upper bound compared to the real query results for the \emph{Join-Order-Benchmark (JOB)}~\cite{DBLP:journals/pvldb/LeisGMBK015}.
+It is clearly visible that the overestimation in the range from $10^3$ to $10^{16}$ is extreme, leading to a very pessimistic approach. 
+One of the problems of such a high overestimation is that the determined join order for a SPJ query could be too defensive and there could be a join order providing a faster runtime. 
 Another disadvantage is that the upper bound cannot be used for the physical operator selection~\cite{hertzschuch-21-ues,DBLP:journals/pvldb/HertzschuchHHL22}. 
-Thus, an obvious optimization opportunity of our \emph{UES} approach is to compute tighter upper bounds to overcome these disadvantages.
+Thus, an obvious optimization opportunity of our UES approach is to compute tighter upper bounds to overcome these disadvantages.
  
-\textbf{Contributions in Detail and Outline:} To summarize, we make the following contributions defining also the outline of this paper:
+\textbf{Contributions in Detail and Outline:} To summarize, we make the following contributions, which also define the outline of this paper:
 \begin{compactitem}
-\item In Section~\ref{sec:UES}, we recap our \emph{UES} concept as foundation for the remainder of the paper.
-\item Our developed PostgreSQL extension called \emph{PostBOUND}\footnote{We will make \emph{PostBOUND} available open-source in
-time for BTW 2023 and we would happily join the reproducibility effort of BTW 2023.} is described in Section~\ref{sec:PostBound}. \emph{PostBOUND} makes upper bound SPJ query optimization a first class citizen in PostgreSQL and \emph{PostBOUND} is designed as extensible framework.% to foster research in that direction.
-\item We enhance the \emph{UES} concept with an idea for a generalized approach to tighten our upper bound based on top-k statistics in Section~\ref{sec:TighterBounds}. 
+\item In Section~\ref{sec:UES}, we recap our UES concept as foundation for the remainder of the paper.
+\item Our developed PostgreSQL extension called \emph{PostBOUND}\footnote{\emph{PostBOUND} is available open-source at \url{https://github.com/rbergm/PostBOUND}. The \texttt{btw23-reproducibility} branch is prepared specifically for the reproducibility effort of BTW 2023.} is described in Section~\ref{sec:PostBound}. \emph{PostBOUND} enables seamless integration of upper bound SPJ query optimization in PostgreSQL and \emph{PostBOUND} is designed as an extensible framework.% to foster research in that direction.
+\item We enhance the UES concept with an idea for a generalized approach to tighten our upper bound based on top-k statistics in Section~\ref{sec:TighterBounds}. 
 \item Section~\ref{sec:Eval} presents selective results of our comprehensive evaluation. In particular, we focus on the evaluation (i) of the upper bound optimization on different workloads as well as different PostgreSQL versions and (ii) of the impact of the tighter bounds.  
 \end{compactitem}
 Finally, we close the paper with related work in Section~\ref{sec:RealtedWork} before concluding in Section~\ref{sec:Conclusion}. 
 
 
-%As shown in~\cite{}, our \emph{UES} concept outperforms other existing upper bound as well as traditional approaches even though our worst-case upper bound overestimates the real cardinalities by large factors. 
+%As shown in~\cite{}, our UES concept outperforms other existing upper bound as well as traditional approaches even though our worst-case upper bound overestimates the real cardinalities by large factors. 
 
 
 

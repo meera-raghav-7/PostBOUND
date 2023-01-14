@@ -5,6 +5,7 @@
 %%% Um einen Artikel auf deutsch zu schreiben, genügt es die Klasse ohne
 %%% Parameter zu laden.
 \documentclass[english]{lni}
+%\documentclass[a4paper,pagesize,13pt,normalheadings,DIV=10]{scrarticle}
 \usepackage{graphicx}
 %\usepackage[caption=false]{subfig}
 \newcommand{\TODO}[1]{\colorbox{yellow}{#1}}
@@ -46,8 +47,8 @@ Claudio Hartmann$^1$ \and
 Dirk Habich$^1$ \and
 Wolfgang Lehner$^1$}
 \startpage{1} % Beginn der Seitenzählung für diesen Beitrag / Start page
-\editor{Herausgeber et al.} % Names of Editors
-\booktitle{20th Conference on Database Systems for Business, Technology and Web} % Name of book title
+\editor{B. K{\"o}nig-Ries et al.} % Names of Editors
+\booktitle{Datenbanksysteme f{\"u}r Business, Technologie und Web (BTW 2023)} % Name of book title
 \yearofpublication{2023}
 %%%\lnidoi{18.18420/provided-by-editor-02} % if known
 \maketitle
@@ -64,8 +65,8 @@ SPJ queries \and join order \and join cardinalities \and upper bound \and genera
 
 \input{01-introduction}
 \input{02-ues}
-\input{04-postbound}
-\input{03-generalizedUpperBound}
+\input{03-postbound}
+\input{04-generalizedUpperBound}
 \input{05-evaluation}
 \input{06-RelatedWork}
 \input{07-Conclusion}

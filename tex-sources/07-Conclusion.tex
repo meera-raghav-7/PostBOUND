@@ -1,9 +1,9 @@
 \section{Conclusion}
 \label{sec:Conclusion}
 The optimization of arbitrary select-project-join (SPJ) queries is still an active research topic.
-In this context, deriving the necessary cardinality estimates from upper bounds is a promising alternative strategy.
-To foster research in that direction, we have introduced \emph{PostBOUND}, a generalized framework implementation making upper bound SPJ query optimization a first class citizen in PostgreSQL. 
-\emph{PostBOUND} provides abstractions to integrate arbitrary upper bounds, to model joins required by a SPJ query and to iteratively construct an optimized join order. Other than calculating the join order, \emph{PostBOUND} also enables the selection of physical operators, and can thus mimic the entire query optimization process.
+In this context, deriving the necessary cardinality estimates from upper bounds is a promising strategy.
+To foster research in that direction, we have introduced \emph{PostBOUND}, a generalized framework implementation to seamlessly integrate upper bound SPJ query optimization in PostgreSQL. 
+\emph{PostBOUND} provides abstractions to integrate arbitrary upper bounds, to model joins required by an SPJ query and to iteratively construct an optimized join order. Other than calculating the join order, \emph{PostBOUND} also enables the selection of physical operators, and can thus mimic the entire query optimization process.
 To highlight the extensibility of \emph{PostBOUND} and to show the research potential, we have additionally presented two tighter upper bound variant ideas using top-k statistics in this paper.
-Our evaluation has shown the efficiency and broad applicability of \emph{PostBOUND} on different workloads and using different PostgreSQL version. 
-Moreover, we also have highlighted the impact of the proposed tighter upper bound variants. 
+Our evaluation has shown the efficiency and broad applicability of \emph{PostBOUND} on different workloads and using different PostgreSQL versions. 
+Moreover, we have also highlighted the impact of the proposed tighter upper bound variants. 

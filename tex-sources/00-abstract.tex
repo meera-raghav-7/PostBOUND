@@ -1,11 +1,11 @@
 \begin{abstract}
-A variety of query optimization papers have shown the disastrous effect of poor cardinality estimates on the overall run time for arbitrary select-project-join (SPJ) queries.
+A variety of query optimization papers have shown the disastrous effect of poor cardinality estimates on the overall runtime for arbitrary select-project-join (SPJ) queries.
 Especially, underestimating join cardinalities for multi-joins can lead to catastrophic join orderings.
 A promising solution to overcome this problem is query optimization based on upper bounds for the join cardinalities.
 In this domain, our proposed UES concept is presently the most efficient technique featuring a simple, yet effective upper bound for an arbitrary number of joins.
-To foster research in that direction, we introduce \emph{PostBOUND}, our generalized framework making upper bound SPJ query optimization a first class citizen in PostgreSQL.
+To foster research in that direction, we introduce \emph{PostBOUND}, our generalized framework to seamlessly integrate upper bound SPJ query optimization in PostgreSQL.
 \emph{PostBOUND} provides abstractions to calculate arbitrary upper bounds, to model joins required by an SPJ query and to iteratively construct an optimized join order.
-To highlight the extensibility of \emph{PostBOUND} and to show the research potential, we additionally present two tighter upper bound UES variants using top-k statistics in this paper.
+To highlight the extensibility of \emph{PostBOUND}, and to show the research potential, we additionally present two tighter upper bound UES variants using top-k statistics in this paper.
 In our evaluation, we show the efficiency and applicability of \emph{PostBOUND} on different workloads as well as using different PostgreSQL versions. 
 Additionally, we evaluate both presented tighter upper bound variant ideas.
 \end{abstract}
