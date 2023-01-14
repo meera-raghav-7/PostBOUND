@@ -53,6 +53,18 @@ for topk in ${APPROX_TOPK_SETTINGS[*]}; do
         --subqueries smart \
         --out-col query --out workloads/topk-setups/job-ues-workload-topk-$topk-approx-smart.csv \
         ../workloads/JOB-Queries/implicit
+
+    # We also need the linear workload here, but we will never execute it. This is due to a weird Python-bug that
+    # causes the optimization time to increase substantially when generating many subqueries (as is the case with
+    # large top-k settings and smart generation strategy). More specifically, the bug seems to be caused by our
+    # implementation of a join tree and how it handles the insertion of subqueries (which should be a cheap process).
+    # Therefore, we compare the optimization time of the linear workload in this case.
+    ./ues-generator.py --pattern "*.sql" --timing --generate-labels --join-paths \
+        --table-estimation precise \
+        --join-estimation topk-approx --topk-length $topk \
+        --subqueries disabled \
+        --out-col query --out workloads/topk-setups/job-ues-workload-topk-$topk-approx-linear.csv \
+        ../workloads/JOB-Queries/implicit
 done
 
 echo "... Running workloads for the cautious bound"
