@@ -30,14 +30,14 @@ here is an overview of the most time-demanding steps in the pipeline:
 - install some R libraries and Python packages
 - download an image of the IMDB
 - download and compile two instances of PostgreSQL
-- load IMDB instances from CSV files for a total of 4 times [^fn-imdb]
-- execute the JOB for a total of 66 times using differently optimized queries [^fn-job]
+- load IMDB instances from CSV files for a total of 3 times [^fn-imdb]
+- execute the JOB for a total of 69 times using differently optimized queries [^fn-job]
 - compile the final LaTeX paper
 
 [^fn-imdb]: This ensures that settings using the native query optimizer encouter the same (fresh) DB state each time
 they are run. Most importantly, this prevents Postgres from optimizing the $n$-th workload iteration based on metadata
 it created during the $(n-1)$-th run.
-[^fn-job]: there are 22 distinct settings and each setting is repeated 3 times to prevent some outliers
+[^fn-job]: there are 23 distinct settings and each setting is repeated 3 times to prevent at least some outliers
 
 
 ## Result artifacts
