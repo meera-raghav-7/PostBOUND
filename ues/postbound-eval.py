@@ -119,9 +119,11 @@ def aggregate_cautious():
 def aggregate_approx():
     job_cards = pd.read_csv("workloads/job-results-true-cards.csv", usecols=["label", "query_result"])
     job_cards.rename(columns={"query_result": "true_card"}, inplace=True)
-    all_workloads_approx = [read_workload_approx(raw="workloads/job-ues-results-base-smart.csv")]
+    all_workloads_approx = [read_workload_approx(raw="workloads/job-ues-results-base-smart.csv"),
+                            read_workload_approx(raw="workloads/job-ues-results-base-linear.csv", linear=True)]
     for topk_setting in [1, 5, 10, 20, 50, 100, 500]:
         all_workloads_approx.append(read_workload_approx(topk_setting))
+        all_workloads_approx.append(read_workload_approx(topk_setting, linear=True))
     results = pd.concat(all_workloads_approx).reset_index().merge(job_cards, on="label")
     results["overestimation"] = (results["upper_bound"] + 1) / (results["true_card"] + 1)
     results["n_subqueries"] = results["query"].apply(lambda q: len(q.subqueries()))

@@ -21,19 +21,37 @@ cd $ROOT/ues
 ./set-workload.sh job
 mkdir -p $ROOT/ues/workloads/topk-setups
 
-echo ".. Generating base workload to compare to"
+# In addition to the smart subqueries for the top-k approx workloads, we also need the linear variants. This is due to
+# a weird Python-bug that causes the optimization time to increase substantially when generating many subqueries
+# (as is the case with large top-k settings and smart generation strategy). More specifically, the bug seems to be
+# caused by our implementation of a join tree and how it handles the insertion of subqueries (which should be a cheap
+# process). Therefore, we compare the optimization time of the linear workload in this case. For our pipeline this
+# means that we need to generate and execute a number of linear workloads in addition to the bushy counterparts that
+# we normally focus our evaluation on, in order to ensure that our analysis still works correctly.
+
+echo ".. Generating base workloads to compare to"
 ./ues-generator.py --pattern "*.sql" --timing --generate-labels --join-paths \
         --table-estimation precise \
         --join-estimation basic \
         --subqueries smart \
         --out-col query --out workloads/job-ues-workload-base-smart.csv \
         ../workloads/JOB-Queries/implicit
+./ues-generator.py --pattern "*.sql" --timing --generate-labels --join-paths \
+        --table-estimation precise \
+        --join-estimation basic \
+        --subqueries disabled \
+        --out-col query --out workloads/job-ues-workload-base-linear.csv \
+        ../workloads/JOB-Queries/implicit
 
-echo ".. Running base workload"
+echo ".. Running base workloads"
 ./experiment-runner.py --csv --csv-col query --per-query-repetitions $QUERY_REPETITIONS \
         --experiment-mode ues --query-mod analyze \
         --out workloads/job-ues-results-base-smart.csv \
         workloads/job-ues-workload-base-smart.csv
+./experiment-runner.py --csv --csv-col query --per-query-repetitions $QUERY_REPETITIONS \
+        --experiment-mode ues --query-mod analyze \
+        --out workloads/job-ues-results-base-linear.csv \
+        workloads/job-ues-workload-base-linear.csv
 
 echo "... Generating workloads for the cautious bound"
 for topk in ${CAUTIOUS_TOPK_SETTINGS[*]}; do
@@ -54,11 +72,6 @@ for topk in ${APPROX_TOPK_SETTINGS[*]}; do
         --out-col query --out workloads/topk-setups/job-ues-workload-topk-$topk-approx-smart.csv \
         ../workloads/JOB-Queries/implicit
 
-    # We also need the linear workload here, but we will never execute it. This is due to a weird Python-bug that
-    # causes the optimization time to increase substantially when generating many subqueries (as is the case with
-    # large top-k settings and smart generation strategy). More specifically, the bug seems to be caused by our
-    # implementation of a join tree and how it handles the insertion of subqueries (which should be a cheap process).
-    # Therefore, we compare the optimization time of the linear workload in this case.
     ./ues-generator.py --pattern "*.sql" --timing --generate-labels --join-paths \
         --table-estimation precise \
         --join-estimation topk-approx --topk-length $topk \
@@ -81,6 +94,11 @@ for topk in ${APPROX_TOPK_SETTINGS[*]}; do
         --experiment-mode ues --query-mod analyze \
         --out workloads/topk-setups/job-ues-results-topk-$topk-approx-smart.csv \
         workloads/topk-setups/job-ues-workload-topk-$topk-approx-smart.csv
+
+    ./experiment-runner.py --csv --csv-col query --per-query-repetitions $QUERY_REPETITIONS \
+        --experiment-mode ues --query-mod analyze \
+        --out workloads/topk-setups/job-ues-results-topk-$topk-approx-linear.csv \
+        workloads/topk-setups/job-ues-workload-topk-$topk-approx-linear.csv
 done
 
 cd $ROOT/postgres
