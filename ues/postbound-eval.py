@@ -97,7 +97,8 @@ def read_workload_approx(topk_length: int = np.nan, raw: str = "", linear: bool 
 
 
 def aggregate_cautious():
-    job_cards = pd.read_csv("workloads/job-results-true-cards.csv", usecols=["label", "query_result"]).rename(columns={"query_result": "true_card"})
+    job_cards = pd.read_csv("workloads/job-results-true-cards.csv", usecols=["label", "query_result"])
+    job_cards.rename(columns={"query_result": "true_card"}, inplace=True)
     all_workloads = [read_workload_cautious(raw="workloads/job-ues-results-base-smart.csv")]
     for topk_setting in range(1, 6):
         all_workloads.append(read_workload_cautious(topk_setting))
@@ -105,25 +106,34 @@ def aggregate_cautious():
     results["overestimation"] = (results["upper_bound"] + 1) / (results["true_card"] + 1)
     results["n_subqueries"] = results["query"].apply(lambda q: len(q.subqueries()))
     results["setting"] = np.where(results["mode"] == "ues", "UES", "Top-" + results["topk_length"].astype(str))
-    settings = pd.Categorical(results["setting"], categories=["UES"] + list(map(lambda k: f"Top-{k}", sorted(filter(lambda k: k > 0, results.topk_length.unique())))), ordered=True)
+    settings = pd.Categorical(results["setting"],
+                              categories=["UES"] + list(map(lambda k: f"Top-{k}",
+                                                            sorted(filter(lambda k: k > 0,
+                                                                          results.topk_length.unique())))),
+                              ordered=True)
     results["setting"] = settings
     results.drop(columns=["optimization_success", "ues_bounds", "query_result", "run"], inplace=True)
     return results
 
 
 def aggregate_approx():
-    job_cards = pd.read_csv("workloads/job-results-true-cards.csv", usecols=["label", "query_result"]).rename(columns={"query_result": "true_card"})
+    job_cards = pd.read_csv("workloads/job-results-true-cards.csv", usecols=["label", "query_result"])
+    job_cards.rename(columns={"query_result": "true_card"}, inplace=True)
     all_workloads_approx = [read_workload_approx(raw="workloads/job-ues-results-base-smart.csv")]
     for topk_setting in [1, 5, 10, 20, 50, 100, 500]:
         all_workloads_approx.append(read_workload_approx(topk_setting))
-    results_approx = pd.concat(all_workloads_approx).reset_index().merge(job_cards, on="label")
-    results_approx["overestimation"] = (results_approx["upper_bound"] + 1) / (results_approx["true_card"] + 1)
-    results_approx["n_subqueries"] = results_approx["query"].apply(lambda q: len(q.subqueries()))
-    results_approx["setting"] = np.where(results_approx["mode"] == "ues", "UES", "Top-" + results_approx["topk_length"].astype(str))
-    settings_approx = pd.Categorical(results_approx["setting"], categories=["UES"] + list(map(lambda k: f"Top-{k}", sorted(filter(lambda k: k > 0, results_approx.topk_length.unique())))), ordered=True)
-    results_approx["setting"] = settings_approx
-    results_approx.drop(columns=["optimization_success", "ues_bounds", "query_result", "run"], inplace=True)
-    return results_approx
+    results = pd.concat(all_workloads_approx).reset_index().merge(job_cards, on="label")
+    results["overestimation"] = (results["upper_bound"] + 1) / (results["true_card"] + 1)
+    results["n_subqueries"] = results["query"].apply(lambda q: len(q.subqueries()))
+    results["setting"] = np.where(results["mode"] == "ues", "UES", "Top-" + results["topk_length"].astype(str))
+    settings = pd.Categorical(results["setting"],
+                              categories=["UES"] + list(map(lambda k: f"Top-{k}",
+                                                            sorted(filter(lambda k: k > 0,
+                                                                          results.topk_length.unique())))),
+                              ordered=True)
+    results["setting"] = settings
+    results.drop(columns=["optimization_success", "ues_bounds", "query_result", "run"], inplace=True)
+    return results
 
 
 def write_tex_table(job_runtimes, ssb_runtimes, outfile):
@@ -285,9 +295,9 @@ def eval_03_idxnlj_operators(report: Report):
 
 def main():
     # Aggregate result files for Top-k settings
-    results = aggregate_cautious()
+    results_cautious = aggregate_cautious()
     results_approx = aggregate_approx()
-    results.to_csv("evaluation/job-ues-eval-topk-exhaustive.csv", index=False)
+    results_cautious.to_csv("evaluation/job-ues-eval-topk-exhaustive.csv", index=False)
     results_approx.to_csv("evaluation/job-ues-eval-topk-approx.csv", index=False)
 
     # Analyze PostBOUND/UES/native results
