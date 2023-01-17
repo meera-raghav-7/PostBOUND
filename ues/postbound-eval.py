@@ -241,6 +241,8 @@ def eval_03_idxnlj_operators(report: Report):
     df_speedup.set_index("label", inplace=True)
     df_speedup["query"] = df_speedup["query"].apply(mosp.MospQuery.parse)
     df_speedup["n_subqueries"] = df_speedup["query"].apply(lambda q: len(q.subqueries()))
+    df_speedup.drop(df_speedup[df_speedup.n_subqueries == 0].index, inplace=True)
+
     df_speedup["idxnlj_speedup"] = df_speedup["execution_time_base"] - df_speedup["execution_time_idxnlj"]
     df_speedup["explain_base"] = df_speedup["explain_base"].apply(json.loads)
     df_speedup["explain_idxnlj"] = df_speedup["explain_idxnlj"].apply(json.loads)
