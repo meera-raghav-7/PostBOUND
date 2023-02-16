@@ -1,61 +1,86 @@
-# Simplicity++
+# Reproducing the PostBOUND results @ BTW'23
 
-This repository modifies and extends the UES algorithm for upper bound-based join ordering of SQL queries, which was
-originally proposed by Hertzschuch et al.[^0].
+The `btw-scripts` folder contains all scripts necessary to start reproducing the paper. Take a look there for
+further details. The remainder of this README is a copy of the README of the `btw-scripts` folder.
 
-The implemented modifications have multiple goals:
+---
 
-1. support new query structures and workloads
-2. enable modification of core components of the algorithm (base table cardinality estimation, join cardinality estimation, subquery generation)
-3. generalize the original UES idea for calculating upper bounds of join cardinalities, thereby tightening the bounds
+The main entry point to reproduce our experimental results and to generate an adapted version of our paper is the
+`run.sh` script.
 
-## Overview
+This script does not require any additional arguments and can be executed as-is. It will do the following:
 
-The repository is structured as follows:
+1. build a Docker image in which the actual experiments will be executed. The image is based on the `Dockerfile` that
+was shipped with the `run.sh` script and this README.
+2. generate a Docker container based on the image. This container will mount the `results` directory, which in the end
+will contain all results produced by the experiments (see below)
+3. start the actual experiments. This includes setting up a number of Postgres instances from scratch, creating
+different databases and query workloads
 
-| Folder        | Description |
-| ------------- | ----------- |
-| `doc`         | Will contain documentation files + figures at some point, currently mostly unused. |
-| `postgres`    | Contains utilities for setting up an entirely local Postgres instance (v14), as well as the required `pg_hint_plan` extension. |
-| `ues`         | The main directory containing the UES implementation as well as most supplementary files (e.g. workload analysis). |
-| `util`        | Contains some utilities for setting up database contents, cache management, workload generation, ... |
-| `workloads`   | Contains query files for different workloads (currently Join Order Benchmark[^1] and Star Schema Benchmark[^2]). |
 
-## Architecture
+## Requirements
 
-![Interaction of the various UES components](doc/figures/ues-architecture.svg)
+It is recommended although not strictly necessary to run the Docker image on a system with at least **32 GB of RAM**.
+The experiments do _not_ use any special hardware like GPUs, nor do they make use of advanced CPU features. Therefore,
+the image should be executable on AMD-based systems as well as Intel-based architectures, although we only tested the
+latter. Since the experiments include repeatetly setting up instances of the IMDB, at least **70 GB of storage** should
+be available. Furthermore, a working **internet connection** is required, with broadband being heavily recommended.
 
-The following description focuses on tools located in the `ues` directory.
-The main component of Simplicity++ is the customizable, UES-based query optimizer. It can be interfaced with directly
-on the command line via the `ues-generator.py` utility. Alternatively, the optimizer can be called from a Python script
-by including `transform/ues.py` and calling the `optimize_query` function. A more detailed description is provided in
-an (work in progress) README in the `ues` directory. The UES component will determine an optimized join order for an
-incoming SQL query, optionally along with the calculated upper bounds. This query can then either be executed directly
-by Postgres, or improved physical join operators can be determined via a second component (accessible via the
-`query-hinting.py` utility or again as part of a Python script by importing `postgres/hint.py`). These operators are
-derived based on the upper bounds previously calculated.
+In total, the experiments will take several hours, but the total runtime should not exceed days. On our hardware
+(Intel Xeon 6126, 92GB main memory),
+it took about 10 hours to execute the entire pipeline. To put the amount of work in the pipeline into perspective,
+here is an overview of the most time-demanding steps in the pipeline:
 
-When executing the query in Postgres, make sure to set the following parameters: `SET join_collapse_limit = 1;` (this
-ensures that the join order calculated by UES is not modified by the Postgres optimizer). `SET enable_nestloop = 'off';`
-(if no operator hints were generated this disables Nested Loop Joins, as documented in the UES paper[^0]). For
-experiemnts we also use `set enable_memoize = 'off';` to disable Memoize operators, since they made experimental results
-harder to reproduce.
+- install a number of packages using `apt`
+- install some R libraries and Python packages
+- download an image of the IMDB
+- download and compile two instances of PostgreSQL
+- load IMDB instances from CSV files for a total of 3 times [^fn-imdb]
+- execute the JOB for a total of about 110 times using differently optimized queries [^fn-job]
+- compile the final LaTeX paper
 
-Please note that query hints are currently under active development and may not proof beneficial, yet.
+[^fn-imdb]: This ensures that settings using the native query optimizer encouter the same (fresh) DB state each time
+they are run. Most importantly, this prevents Postgres from optimizing the $n$-th workload iteration based on metadata
+it created during the $(n-1)$-th run.
+[^fn-job]: there are approx. 35 distinct settings and each setting is repeated 3 times to prevent at least some outliers
 
-## Improved upper bounds
 
-![Example of Top-k based upper bound estimation](doc/figures/top-k-estimation.svg)
+## Result artifacts
 
-One of the main contributions of Simplicity++ is the tightening of upper bounds used by UES. This is achieved by
-leveraging full Top-k lists for attributes (or Most Common Values lists), rather than only considering the highest
-attribute frequency. This estimation enables a precise calculation of output cardinalities for certain attribute values
-and improves the statistics for the fallback UES procedure.
+All results of the experiments are store in the `results` directory. This includes a freshly compiled version of our
+paper (called `paper.pdf`), as well as an auxillary document called `evaluation_report.txt` with additional information.
 
-For a more detailed explanation of this procedure, consult the (currently also work in progress) paper on Simplicity++.
+The paper is generated and updated as follows:
 
-## Literature
+- Figure 1 is rendered based on the specific UES workload generated during the experiments, although it only depends
+on the calculated upper bounds which should be static. The corresponding experiment is experiment 1.
+- Table 1 is updated based on the runtime measures of experiment 2
+- Figure 8 is rendered based on the bounds and optimization times obtained in experiment 4 (sic.). Once again, the
+upper bounds themselves should be static.
 
-[^0]: Simplicity Done Right for Join Ordering - Hertzschuch et al., CIDR'21 ([paper](https://www.cidrdb.org/cidr2021/papers/cidr2021_paper01.pdf), [GitHub](https://github.com/axhertz/SimplicityDoneRight))
-[^1]: Query Optimization Through the Looking Glass - Leis et al., VLDB 27 ([paper](https://db.in.tum.de/~leis/papers/lookingglass.pdf))
-[^2]: Star Schema Benchmark - O'Neil et al. ([paper](https://www.cs.umb.edu/~poneil/StarSchemaB.PDF))
+Notably, Figures 7 and 9 are not updated during optimization, because they were layouted manually. Instead, experiment
+3 reproduces the results of Figure 7 and experiment 5 reproduces the results of Figure 9. To mitigate the missing
+figures, the `evaluation_report.txt` contains a textual description of the results, equivalent to (but not as pretty
+as) the figures.
+
+Furthermore, all performance measurements that only appear in the text parts of the paper are left as-is. Still, the
+raw data that percentages, etc. are based on, is exported in the `raw` subfolder. Lastly, the description of the
+underlying hardware of the experiments is static as well.
+
+
+## Repeating experiments
+
+The easiest way to rerun experiments, is by deleting the Docker image and restarting the `run.sh` script. Keep in mind,
+that this indeed repeats _all_ experiments and _all_ setup.
+
+If only a specific subset of the experiments should be rerun, this can be achieved by restarting the corresponding
+experiment scripts (see above) _from within the Docker container_. However, to ensure their successfull completion,
+the system has to be setup according to the steps in `btw-start.sh`. Most importantly, this includes activating the
+Python virtual environment. If in doubt, take a look at the commands in the `btw-start.sh` script. To export the results
+and update the paper, etc., execute the `btw-tex.sh` script.
+
+
+## Cleaning up
+
+Since all experiments take place in the Docker container, it is sufficient to delete both the container, as well as the
+underlying image to remove all artifacts. Afterwards, they can be re-created by running the `run.sh` script again.
