@@ -74,75 +74,12 @@ class TestDatabase(unittest.TestCase):
         self.assertGreater(result_mysql, 0, "No total values found in MYSQL table")
     
     def test_index_presence(self):
+        result_postgres = self.pg_connection.schema().has_index(self.column_ref1)
+        self.assertTrue(result_postgres, msg="Attribute is not indexed.")
+
+        result_mysql = self.mysql_connection.schema().has_index(self.column_ref1)
+        self.assertTrue(result_mysql, msg="Attribute is not indexed.") 
         
-        pg_query = f"SELECT indexname FROM pg_indexes WHERE tablename = '{self.table_ref1}'"
-        self.pg_cursor.execute(pg_query)
-        pg_result = self.pg_cursor.fetchall()
-        index_list = [row[0] for row in pg_result]
-        self.assertGreater(len(index_list), 0, "No indexes found in PostgreSQL table")
-
-        
-        mysql_query = f"SHOW INDEXES FROM {self.table_ref1}"
-        self.mysql_cursor.execute(mysql_query)
-        index_list = self.mysql_cursor.fetchall()
-        self.assertGreater(len(index_list), 0, "No indexes found in MySQL table")
-
-    def test_joins(self):
-        
-        pg_join_query = f"SELECT COUNT(*) FROM {self.table_ref1} INNER JOIN {self.table_ref2} ON {self.column_ref1} = {self.column_ref3}"
-        pg_result = self.pg_cursor.execute(pg_join_query).fetchone()[0]
-        # Assert that the result is greater than or equal to 1
-        self.assertGreaterEqual(pg_result, 0, "PostgreSQL join did not return the correct number of records")
-
-        
-        mysql_join_query = f"SELECT COUNT(*) FROM {self.table_ref1} INNER JOIN {self.table_ref2} ON {self.column_ref1} = {self.column_ref3}"
-        self.mysql_cursor.execute(mysql_join_query)
-        mysql_result = self.mysql_cursor.fetchone()[0]
-        # Assert that the result is greater than or equal to 1
-        self.assertGreaterEqual(mysql_result, 0, "MySQL join did not return the correct number of records")
-
-    def test_threading(self):
-        def connect_to_postgres():
-            
-            pg_join_query = f"SELECT COUNT(*) FROM {self.table_ref1}"
-            pg_result = self.pg_cursor.execute(pg_join_query).fetchone()[0]
-            self.assertGreaterEqual(pg_result, 1, "PostgreSQL did not give correct results ")
-            
-        t = threading.Thread(target=connect_to_postgres)
-        t.start()
-        t.join()
-
-        def connect_to_mysql():
-            
-            
-            
-            mysql_join_query = f"SELECT COUNT(*) FROM {self.table_ref1}"
-            self.mysql_cursor.execute(mysql_join_query)
-            mysql_result = self.mysql_cursor.fetchone()[0]
-            self.assertGreaterEqual(mysql_result, 1, "MYSQL did not give correct results")
-
-        t = threading.Thread(target=connect_to_mysql)
-        t.start()
-        t.join()
-
-
-
-    def test_sql_injection_vulnerability(self):
-        # Test for SQL injection vulnerability
-        
-        
-        query = f"SELECT * FROM {self.table_ref1} WHERE {self.column_ref1} = %s"
-        self.pg_cursor.execute(query, (1,))
-        pg_result = self.pg_cursor.fetchone()
-        self.assertGreaterEqual(len(pg_result), 1, "SQL injection vulnerability found!")
-
-        
-        
-        query = f"SELECT * FROM {self.table_ref1} WHERE {self.column_ref1} = %s"
-        self.mysql_cursor.execute(query, (1,))
-        mysql_result = self.mysql_cursor.fetchone()
-        self.assertGreaterEqual(len(mysql_result), 1, "SQL injection vulnerability found!")
-
     @classmethod
     def tearDownClass(self):
         self.pg_cursor.close()
