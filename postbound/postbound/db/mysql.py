@@ -6,14 +6,20 @@ import dataclasses
 import json
 import os
 import textwrap
-from collections.abc import Sequence
-from typing import Any, Optional
+from collections.abc import Sequence,Iterable
+from dataclasses import dataclass
+
+from typing import Any, Optional,Union
 
 import mysql.connector
 
 from postbound.db import db
-from postbound.qal import qal, base, clauses, transform
-from postbound.util import misc
+from postbound.qal import qal, base, clauses, transform, formatter
+from postbound.optimizer import jointree
+from postbound.optimizer.physops import operators as physops
+from postbound.optimizer.planmeta import hints as planmeta
+from postbound.util import collections as collection_utils, logging, misc , typing as type_utils
+
 
 
 @dataclasses.dataclass(frozen=True)
@@ -45,6 +51,13 @@ class MysqlInterface(db.Database):
 
     def schema(self) -> db.DatabaseSchema:
         return self._db_schema
+    
+    def hinting(self) -> db.HintService:
+        return MysqlHintService()
+
+    
+    def optimizer(self) -> db.OptimizerInterface:
+        return MysqlOptimizer(self)
 
     def statistics(self, emulated: bool | None = None, cache_enabled: Optional[bool] = None) -> db.DatabaseStatistics:
         if emulated is not None:
@@ -241,6 +254,183 @@ class MysqlStatisticsInterface(db.DatabaseStatistics):
         if not self.enable_emulation_fallback:
             raise db.UnsupportedDatabaseFeatureError(self._db, "most common values statistics")
         return self._calculate_most_common_values(column, k=k, cache_enabled=True)
+
+
+MysqlOptimizerSettings = {
+    physops.JoinOperators.IndexMergeJoin: "index_merge",
+    physops.JoinOperators.BlockNestedLoopJoin: "block_nested_loop",
+    physops.JoinOperators.HashJoin: "hash_join"
+}
+
+
+MysqlOptimizerHints = {
+    physops.JoinOperators.BlockNestedLoopJoin: "BNL",
+    physops.JoinOperators.IndexMergeJoin: "INDEX_MERGE",
+    physops.JoinOperators.IndexJoin: "INDEX",
+    physops.JoinOperators.MergeJoin: "MERGE",
+    physops.ScanOperators.IndexScan: "INDEX_SCAN",
+    physops.ScanOperators.TableScan: "TABLE_SCAN",
+    physops.JoinOperators.HashJoin: "HASH_JOIN"
+}
+
+
+
+    
+MysqlJoinHints = {physops.JoinOperators.BlockNestedLoopJoin, physops.JoinOperators.IndexMergeJoin, 
+                  physops.JoinOperators.MergeJoin, physops.JoinOperators.IndexJoin, physops.JoinOperators.HashJoin}
+
+MysqlScanHints = {physops.ScanOperators.IndexScan, physops.ScanOperators.TableScan}
+
+MysqlPlanHints = {planmeta.HintType.JoinIndexHint}
+
+@dataclass
+class HintParts:
+    """Captures the different kinds of Postgres-hints to collect them more easily."""
+    settings: list[str]
+    hints: list[str]
+
+    @staticmethod
+    def empty() -> HintParts:
+        """An empty hint parts object, i.e. no hints have been specified, yet."""
+        return HintParts([], [])
+
+    def merge_with(self, other: HintParts) -> HintParts:
+        """Combines the hints that are contained in this hint parts object with all hints in the other object.
+
+        This construct new hint parts and leaves the current object unmodified.
+        """
+        merged_settings = self.settings + [setting for setting in other.settings if setting not in self.settings]
+        merged_hints = self.hints + [hint for hint in other.hints if hint not in self.hints]
+        return HintParts(merged_settings, merged_hints)
+
+def _generate_join_key(tables: Iterable[base.TableReference]) -> str:
+    """Builds a MySQL-compatible identifier for the join consisting of the given tables."""
+    return ", ".join(tab.identifier() for tab in tables)
+  
+
+
+def _generate_mysql_operator_hints(physical_operators: physops.PhysicalOperatorAssignment) -> HintParts:
+    """Generates the hints and preparatory statements to enforce the selected optimization ."""
+    settings = []
+    for operator, enabled in physical_operators.global_settings.items():
+        if enabled is None:
+            setting = "default"
+        else:
+            setting = "on" if enabled else "off"
+        operator_key = MysqlOptimizerSettings[operator]
+        settings.append(f"SET optimizer_switch='{operator_key}={setting}';")
+
+    hints = []
+    for table, scan_assignment in physical_operators.scan_operators.items():
+        table_key = table.identifier()
+        scan_assignment = MysqlOptimizerHints[scan_assignment.operator]
+        hints.append(f"{scan_assignment}({table_key})")
+
+    if hints:
+        hints.append("")
+    for join, join_assignment in physical_operators.join_operators.items():
+        join_key = _generate_join_key(join)
+        join_assignment = MysqlOptimizerHints[join_assignment.operator]
+        hints.append(f"{join_assignment}({join_key})")
+
+    if not settings and not hints:
+        return HintParts.empty()
+
+    return HintParts(settings, hints)
+
+
+
+
+
+def _generate_mysql_index_hints(plan_parameters: planmeta.PlanParameterization) -> HintParts:
+    hints, settings = [], []
+
+    
+    for table, index_list in plan_parameters.index_hints.items():
+        for index in index_list:
+            if table:
+                index = ", ".join(index_list)
+                hints.append(f"FORCE_INDEX({table.identifier()} {index})")
+                break  
+            else:
+                hints.append(f"FORCE_INDEX({', '.join(index_list)})")
+                break
+    
+    for tables in plan_parameters.join_order_hints.keys():
+        hint = ', '.join(table.identifier() for table in tables)
+        hints.append(f"JOIN_ORDER({hint})")
+    
+
+
+    return HintParts(settings, hints)    
+
+    
+
+def _generate_hint_block(parts: HintParts) -> Optional[clauses.Hint]:
+    """Constructs the hint block for the given hint parts"""
+    settings, hints = parts.settings, parts.hints
+    if not settings and not hints:
+        return None
+    settings_block = "\n".join(settings)
+    hints_block = "\n".join(["/*+"] + ["  " + hint for hint in hints] + ["*/"]) if hints else ""
+    return clauses.Hint(settings_block, hints_block)
+
+
+def _apply_hint_block_to_query(query: qal.SqlQuery, hint_block: Optional[clauses.Hint]) -> qal.SqlQuery:
+    """Generates a new query with the given hint block."""
+    return transform.add_clause(query, hint_block) if hint_block else query
+
+
+
+
+class MysqlHintService(db.HintService):
+
+
+    def generate_hints(self, query: qal.SqlQuery,
+                       join_order: Optional[jointree.LogicalJoinTree | jointree.PhysicalQueryPlan] = None,
+                       physical_operators: Optional[physops.PhysicalOperatorAssignment] = None,
+                       plan_parameters: Optional[planmeta.PlanParameterization] = None) -> qal.SqlQuery:
+        
+
+        join_order
+        hint_parts = None
+
+
+        hint_parts = hint_parts if hint_parts else HintParts.empty()
+        if physical_operators:
+            operator_hints = _generate_mysql_operator_hints(physical_operators)
+            hint_parts = hint_parts.merge_with(operator_hints)
+        
+        if plan_parameters:
+            plan_hints = _generate_mysql_index_hints(plan_parameters)
+            hint_parts = hint_parts.merge_with(plan_hints)
+
+
+        hint_block = _generate_hint_block(hint_parts)
+        query = _apply_hint_block_to_query(query, hint_block)
+        return query
+
+
+    def format_query(self, query: qal.SqlQuery) -> str:
+        return formatter.format_quick(query)
+    
+    def supports_hint(self, hint: physops.PhysicalOperator | planmeta.HintType) -> bool:
+        """Checks, whether the database system is capable of using the specified hint or operator."""
+        return hint in MysqlJoinHints | MysqlScanHints | MysqlPlanHints
+    
+class MysqlOptimizer(db.OptimizerInterface):
+    def __init__(self, mysql_instance: MysqlInterface) -> None:
+        self._mysql_instance = mysql_instance
+
+    def query_plan(self, query: qal.SqlQuery | str) -> db.QueryExecutionPlan:
+        return None
+
+    def cardinality_estimate(self, query: qal.SqlQuery | str) -> int:
+        return None
+
+    def cost_estimate(self, query: qal.SqlQuery | str) -> float:
+        return None
+    
 
 
 def _parse_mysql_connection(config_file: str) -> MysqlConnectionArguments:

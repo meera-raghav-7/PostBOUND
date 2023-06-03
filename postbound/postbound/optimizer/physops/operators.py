@@ -19,6 +19,8 @@ class ScanOperators(enum.Enum):
     SequentialScan = "Seq. Scan"
     IndexScan = "Idx. Scan"
     IndexOnlyScan = "Idx-only Scan"
+    TableScan = "Table Scan"
+    
 
 
 class JoinOperators(enum.Enum):
@@ -30,7 +32,10 @@ class JoinOperators(enum.Enum):
     HashJoin = "Hash Join"
     SortMergeJoin = "Sort-Merge Join"
     IndexNestedLoopJoin = "Idx. NLJ"
-
+    IndexMergeJoin = "Index Merge Join"
+    IndexJoin = "Index Join"
+    MergeJoin = "Merge Join"
+    BlockNestedLoopJoin = "Block Nested-Loop Join"
 
 @dataclass(frozen=True)
 class ScanOperatorAssignment:
