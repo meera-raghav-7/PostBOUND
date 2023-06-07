@@ -19,7 +19,7 @@ class ScanOperators(enum.Enum):
     SequentialScan = "Seq. Scan"
     IndexScan = "Idx. Scan"
     IndexOnlyScan = "Idx-only Scan"
-    TableScan = "Table Scan"
+    BitmapScan = "Bitmap Scan"
     
 
 
@@ -45,6 +45,12 @@ class ScanOperatorAssignment:
 
     def inspect(self) -> str:
         return f"USING {self.operator}" if self.operator else ""
+
+    def __repr__(self) -> str:
+        return str(self)
+
+    def __str__(self) -> str:
+        return f"{self.operator.value}({self.table})"
 
 
 class JoinOperatorAssignment:
@@ -89,7 +95,8 @@ class JoinOperatorAssignment:
         return str(self)
 
     def __str__(self) -> str:
-        return f"{self.operator}({self.join})"
+        join_str = ", ".join(str(tab) for tab in self.join)
+        return f"{self.operator.value}({join_str})"
 
 
 class DirectionalJoinOperatorAssignment(JoinOperatorAssignment):
@@ -216,3 +223,14 @@ class PhysicalOperatorAssignment:
             return self.join_operators.get(frozenset(item), None)
         else:
             return None
+
+    def __repr__(self) -> str:
+        return str(self)
+
+    def __str__(self) -> str:
+        global_str = ", ".join(f"{op.value}: {enabled}" for op, enabled in self.global_settings.items())
+        scans_str = ", ".join(
+            f"{scan.table.identifier()}: {scan.operator.value}" for scan in self.scan_operators.values())
+        joins_keys = ((join, "⨝".join(tab.identifier() for tab in join.join)) for join in self.join_operators.values())
+        joins_str = ", ".join(f"{key}: {join.operator.value}" for join, key in joins_keys)
+        return f"global=[{global_str}] scans=[{scans_str}] joins=[{joins_str}]"

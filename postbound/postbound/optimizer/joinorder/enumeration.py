@@ -2,14 +2,13 @@
 from __future__ import annotations
 
 import abc
-import functools
 import random
 from collections.abc import Sequence
 from typing import Optional, Generator
 
 import networkx as nx
 
-from postbound.qal import qal, base, predicates as preds
+from postbound.qal import qal, base
 from postbound.optimizer import jointree, validation
 from postbound.util import networkx as nx_utils
 
@@ -20,9 +19,6 @@ class JoinOrderOptimizer(abc.ABC):
     The join ordering is the first step in the optimization process. Therefore, the implemented optimization strategy
     can apply an entire green-field approach.
     """
-
-    def __init__(self, name: str):
-        self.name = name
 
     @abc.abstractmethod
     def optimize_join_order(self, query: qal.SqlQuery
@@ -143,7 +139,7 @@ class RandomJoinOrderOptimizer(JoinOrderOptimizer):
     """
 
     def __init__(self) -> None:
-        super().__init__("Random enumeration")
+        super().__init__()
         self._generator = RandomJoinOrderGenerator()
 
     def optimize_join_order(self, query: qal.SqlQuery) -> Optional[jointree.LogicalJoinTree]:
@@ -240,7 +236,7 @@ class EmptyJoinOrderOptimizer(JoinOrderOptimizer):
     """Dummy implementation of the join order optimizer that does not actually optimize anything."""
 
     def __init__(self) -> None:
-        super().__init__("empty")
+        super().__init__()
 
     def optimize_join_order(self, query: qal.SqlQuery) -> Optional[jointree.LogicalJoinTree]:
         return None

@@ -561,7 +561,20 @@ class CompoundPredicate(AbstractPredicate):
             raise ValueError("No predicates supplied.")
         if len(parts) == 1:
             return parts[0]
-        return CompoundPredicate(expr.LogicalSqlCompoundOperators.And, list(parts))
+        return CompoundPredicate(expr.LogicalSqlCompoundOperators.And, parts)
+
+    @staticmethod
+    def create_not(predicate: AbstractPredicate) -> CompoundPredicate:
+        return CompoundPredicate(expr.LogicalSqlCompoundOperators.Not, predicate)
+
+    @staticmethod
+    def create_or(parts: Collection[AbstractPredicate]) -> AbstractPredicate:
+        parts = list(parts)
+        if not parts:
+            raise ValueError("No predicates supplied.")
+        if len(parts) == 1:
+            return parts[0]
+        return CompoundPredicate(expr.LogicalSqlCompoundOperators.Or, parts)
 
     def __init__(self, operation: expr.LogicalSqlCompoundOperators,
                  children: AbstractPredicate | Sequence[AbstractPredicate]):
@@ -975,9 +988,9 @@ class QueryPredicates:
             aggregated_predicates.append(CompoundPredicate.create_and(join_group))
         return aggregated_predicates
 
-    @functools.cache
     def joins_between(self, first_table: base.TableReference | Iterable[base.TableReference],
-                      second_table: base.TableReference | Iterable[base.TableReference]) -> Optional[AbstractPredicate]:
+                      second_table: base.TableReference | Iterable[base.TableReference]
+                      ) -> Optional[AbstractPredicate]:
         """Provides the (conjunctive) join predicate that joins the given tables.
 
         If `first_table` or `second_table` contain multiple tables, all join predicates between tables from the
@@ -990,18 +1003,20 @@ class QueryPredicates:
             return None
 
         if isinstance(first_table, base.TableReference) and isinstance(second_table, base.TableReference):
+            if first_table == second_table:
+                return None
             first_joins: Collection[AbstractPredicate] = self.joins_for(first_table)
-            matching_joins = [join for join in first_joins if join.joins_table(second_table)]
+            matching_joins = {join for join in first_joins if join.joins_table(second_table)}
             return CompoundPredicate.create_and(matching_joins) if matching_joins else None
 
-        matching_joins = []
+        matching_joins = set()
         first_table, second_table = collection_utils.enlist(first_table), collection_utils.enlist(second_table)
         for first in frozenset(first_table):
             for second in frozenset(second_table):
                 join_predicate = self.joins_between(first, second)
                 if not join_predicate:
                     continue
-                matching_joins.append(join_predicate)
+                matching_joins.add(join_predicate)
         return CompoundPredicate.create_and(matching_joins) if matching_joins else None
 
     def joins_tables(self, tables: base.TableReference | Iterable[base.TableReference],

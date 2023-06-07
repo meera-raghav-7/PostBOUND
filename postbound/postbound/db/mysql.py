@@ -1,12 +1,13 @@
 """Contains the MySQL implementation of the Database interface."""
 from __future__ import annotations
-
+import functools
 import configparser
 import dataclasses
 import json
 import os
 import textwrap
 from collections.abc import Sequence,Iterable
+import sys
 from dataclasses import dataclass
 
 from typing import Any, Optional,Union
@@ -14,7 +15,7 @@ from typing import Any, Optional,Union
 import mysql.connector
 
 from postbound.db import db
-from postbound.qal import qal, base, clauses, transform, formatter
+from postbound.qal import qal, base, clauses, transform, formatter,expressions
 from postbound.optimizer import jointree
 from postbound.optimizer.physops import operators as physops
 from postbound.optimizer.planmeta import hints as planmeta
@@ -113,7 +114,7 @@ class MysqlInterface(db.Database):
         version = self._cur.fetchone()[0]
         return misc.Version(version)
 
-    def inspect(self) -> dict:
+    def describe(self) -> dict:
         base_info = {
             "system_name": self.database_system_name(),
             "system_version": self.database_system_version(),
@@ -269,7 +270,6 @@ MysqlOptimizerHints = {
     physops.JoinOperators.IndexJoin: "INDEX",
     physops.JoinOperators.MergeJoin: "MERGE",
     physops.ScanOperators.IndexScan: "INDEX_SCAN",
-    physops.ScanOperators.TableScan: "TABLE_SCAN",
     physops.JoinOperators.HashJoin: "HASH_JOIN"
 }
 
@@ -279,9 +279,9 @@ MysqlOptimizerHints = {
 MysqlJoinHints = {physops.JoinOperators.BlockNestedLoopJoin, physops.JoinOperators.IndexMergeJoin, 
                   physops.JoinOperators.MergeJoin, physops.JoinOperators.IndexJoin, physops.JoinOperators.HashJoin}
 
-MysqlScanHints = {physops.ScanOperators.IndexScan, physops.ScanOperators.TableScan}
+MysqlScanHints = {physops.ScanOperators.IndexScan}
 
-MysqlPlanHints = {planmeta.HintType.JoinIndexHint}
+MysqlPlanHints = {planmeta.HintType.JoinOrderHint}
 
 @dataclass
 class HintParts:
@@ -339,9 +339,6 @@ def _generate_mysql_operator_hints(physical_operators: physops.PhysicalOperatorA
     return HintParts(settings, hints)
 
 
-
-
-
 def _generate_mysql_index_hints(plan_parameters: planmeta.PlanParameterization) -> HintParts:
     hints, settings = [], []
 
@@ -380,8 +377,35 @@ def _apply_hint_block_to_query(query: qal.SqlQuery, hint_block: Optional[clauses
     """Generates a new query with the given hint block."""
     return transform.add_clause(query, hint_block) if hint_block else query
 
+def modify_str_methods():
+    string_method = expressions.StaticValueExpression.__str__
+    cast_exp = expressions.CastExpression.__str__
+    exp_method = clauses.Explain.__str__
+    def typecasting(cast_expression):
+        if type(cast_expression) == expressions.CastExpression:
+            sys.exit("MySQL doesn't support type casting.")
 
-
+    def double_quotes(expression):
+        if type(expression) == expressions.StaticValueExpression and type(expression.value) == str:
+            return f'"{expression.value}"'
+        return string_method(expression)
+    
+    def modified_explain_str(exp_method) -> str:
+            explain_prefix = "EXPLAIN"
+            explain_body = ""
+            if exp_method.analyze and exp_method.target_format:
+                explain_body = f" FORMAT = {exp_method.target_format}"
+            elif exp_method.analyze:
+                explain_body = " ANALYZE"
+            elif exp_method.target_format:
+                explain_body = f" FORMAT = {exp_method.target_format}"
+            return explain_prefix + explain_body
+    
+    expressions.CastExpression.__str__ = typecasting
+    expressions.StaticValueExpression.__str__ = double_quotes
+    clauses.Explain.__str__ = modified_explain_str
+    
+    return string_method, cast_exp,exp_method
 
 class MysqlHintService(db.HintService):
 
@@ -391,11 +415,8 @@ class MysqlHintService(db.HintService):
                        physical_operators: Optional[physops.PhysicalOperatorAssignment] = None,
                        plan_parameters: Optional[planmeta.PlanParameterization] = None) -> qal.SqlQuery:
         
-
         join_order
         hint_parts = None
-
-
         hint_parts = hint_parts if hint_parts else HintParts.empty()
         if physical_operators:
             operator_hints = _generate_mysql_operator_hints(physical_operators)
@@ -410,9 +431,15 @@ class MysqlHintService(db.HintService):
         query = _apply_hint_block_to_query(query, hint_block)
         return query
 
-
     def format_query(self, query: qal.SqlQuery) -> str:
-        return formatter.format_quick(query)
+        
+        string_method, cast_exp,exp_method  = modify_str_methods()
+        query = formatter.format_quick(query)
+        expressions.StaticValueExpression.__str__ = string_method
+        expressions.CastExpression.__str__ = cast_exp
+        clauses.Explain.__str__ = exp_method
+        return query
+        
     
     def supports_hint(self, hint: physops.PhysicalOperator | planmeta.HintType) -> bool:
         """Checks, whether the database system is capable of using the specified hint or operator."""
@@ -430,8 +457,6 @@ class MysqlOptimizer(db.OptimizerInterface):
 
     def cost_estimate(self, query: qal.SqlQuery | str) -> float:
         return None
-    
-
 
 def _parse_mysql_connection(config_file: str) -> MysqlConnectionArguments:
     config = configparser.ConfigParser()

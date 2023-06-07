@@ -101,4 +101,3 @@ class HintType(enum.Enum):
     JoinDirectionHint = "Join direction"
     ParallelizationHint = "Par. workers"
     CardinalityHint = "Cardinality"
-    JoinIndexHint = "Join Index"

@@ -1,13 +1,15 @@
 """Contains utilities to access and modify dictionaries more conveniently."""
 from __future__ import annotations
 
+import numpy as np
+
 import collections
-import collections.abc
 import itertools
 import numbers
 import typing
 import warnings
-from typing import Callable, Optional
+from collections.abc import Callable, Iterable, Sequence
+from typing import Optional
 
 T = typing.TypeVar("T")
 K = typing.TypeVar("K")
@@ -21,8 +23,7 @@ def key(dictionary: dict[K, V]) -> K:
     """
     if not len(dictionary) == 1:
         raise ValueError("Dictionary must contain exactly 1 entry, not " + str(len(dictionary)))
-    for k in dictionary:
-        return k
+    return next(iter(dictionary.keys()))
 
 
 def value(dictionary: dict[K, V]) -> V:
@@ -32,8 +33,7 @@ def value(dictionary: dict[K, V]) -> V:
     """
     if not len(dictionary) == 1:
         raise ValueError("Dictionary must contain exactly 1 entry, not " + str(len(dictionary)))
-    for v in dictionary.values():
-        return v
+    return next(iter(dictionary.values()))
 
 
 def merge(a: dict[K, V], b: dict[K, V], *, updater: Optional[Callable[[K, V, V], V]] = None) -> dict[K, V]:
@@ -66,7 +66,7 @@ def update(dictionary: dict[K, V], updater: Callable[[K, V], T]) -> dict[K, T]:
 
 def explode(dictionary: dict[K, list[V]]) -> list[tuple[K, V]]:
     """Transforms dicts mapping keys to lists of values to a list of key/value pairs."""
-    values = []
+    values: list[tuple[K, V]] = []
     for k, dict_values in dictionary.items():
         values.extend(zip(itertools.cycle([k]), dict_values))
     return values
@@ -123,6 +123,14 @@ def invert_multi(mapping: dict[K, list[V]]) -> dict[V, list[K]]:
     return level2
 
 
+def aggregate(dictionaries: Iterable[dict[K, V]]) -> dict[K, Sequence[V]]:
+    aggregated_dict = collections.defaultdict(list)
+    for d in dictionaries:
+        for k, v in d.items():
+            aggregated_dict[k].append(v)
+    return dict(aggregated_dict)
+
+
 def invert(mapping: dict[K, V]) -> dict[V, K]:
     """Inverts the `key -> value` mapping of a dict to become `value -> key` instead.
 
@@ -142,6 +150,11 @@ def argmin(mapping: dict[K, numbers.Number]) -> K:
     return min(mapping, key=mapping.get)
 
 
+def dict_to_numpy(data: dict[K, V]) -> np.array[V]:
+    sorted_dict = {k: data[k] for k in sorted(data)}
+    return np.asarray(list(sorted_dict.values()))
+
+
 class CustomHashDict(collections.UserDict[K, V]):
     """A normal Python dictionary that uses a custom hash function instead of the default hash() call."""
 
@@ -154,3 +167,14 @@ class CustomHashDict(collections.UserDict[K, V]):
 
     def __setitem__(self, k: K, item: V) -> None:
         super().__setitem__(self.hash_function(k), item)
+
+
+class DynamicDefaultDict(collections.UserDict[K, V]):
+    def __init__(self, factory: Callable[[K], V]):
+        super().__init__()
+        self.factory = factory
+
+    def __getitem__(self, k: K) -> V:
+        if k not in self.data:
+            self.data[k] = self.factory(k)
+        return self.data[k]

@@ -6,7 +6,6 @@ as a utility to easily obtain database connections.
 Take a look at the central `Database` class for more details. All concrete database systems need to implement this
 interface.
 """
-
 from __future__ import annotations
 
 import abc
@@ -197,7 +196,7 @@ class Database(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def inspect(self) -> dict:
+    def describe(self) -> dict:
         """Provides a representation of the current database connection as well as the system settings."""
         raise NotImplementedError
 
@@ -598,19 +597,32 @@ class QueryExecutionPlan:
     """
 
     def __init__(self, node_type: str, is_join: bool, is_scan: bool, *, table: Optional[base.TableReference] = None,
-                 children: Optional[Iterable[QueryExecutionPlan]] = None, parallel_workers: float = math.nan,
-                 estimated_cost: float = math.nan, estimated_cardinality: float = math.nan,
-                 true_cardinality: float = math.nan, execution_time: float = math.nan) -> None:
+                 children: Optional[Iterable[QueryExecutionPlan, QueryExecutionPlan]] = None,
+                 parallel_workers: float = math.nan, cost: float = math.nan,
+                 estimated_cardinality: float = math.nan, true_cardinality: float = math.nan,
+                 execution_time: float = math.nan, physical_operator: Optional[physops.PhysicalOperator] = None,
+                 inner_child: Optional[QueryExecutionPlan] = None) -> None:
         self.node_type = node_type
+        self.physical_operator = physical_operator
         self.is_join = is_join
         self.is_scan = is_scan
+        if is_scan and not isinstance(physical_operator, physops.ScanOperators):
+            warnings.warn("Supplied operator is scan operator but node is created as non-scan node")
+        if is_join and not isinstance(physical_operator, physops.JoinOperators):
+            warnings.warn("Supplied operator is join operator but node is created as non-join node")
 
         self.parallel_workers = parallel_workers
-        self.children: Sequence[QueryExecutionPlan] = list(children) if children else []
+        self.children: Sequence[QueryExecutionPlan] = tuple(children) if children else ()
+        self.inner_child = inner_child
+        if self.inner_child and len(self.children) == 2:
+            first_child, second_child = self.children
+            self.outer_child = first_child if self.inner_child == second_child else second_child
+        else:
+            self.outer_child = None
 
         self.table = table
 
-        self.estimated_cost = estimated_cost
+        self.cost = cost
         self.estimated_cardinality = estimated_cardinality
         self.true_cardinality = true_cardinality
         self.execution_time = execution_time
@@ -624,17 +636,85 @@ class QueryExecutionPlan:
         own_table = [self.table] if self.table else []
         return frozenset(own_table + collection_utils.flatten(child.tables() for child in self.children))
 
+    def is_base_join(self) -> bool:
+        return self.is_join and all(child.is_scan_branch() for child in self.children)
+
+    def is_bushy_join(self) -> bool:
+        return self.is_join and all(child.is_join_branch() for child in self.children)
+
+    def is_scan_branch(self) -> bool:
+        return self.is_scan or (len(self.children) == 1 and self.children[0].is_scan_branch())
+
+    def is_join_branch(self) -> bool:
+        return self.is_join or (len(self.children) == 1 and self.children[0].is_join_branch())
+
+    def fetch_base_table(self) -> Optional[base.TableReference]:
+        if not self.is_scan_branch():
+            raise ValueError("No unique base table for non-scan branches!")
+        if self.table:
+            return self.table
+        return self.children[0].fetch_base_table()
+
     def total_processed_rows(self) -> float:
         if not self.is_analyze():
             return math.nan
         return self.true_cardinality + sum(child.total_processed_rows() for child in self.children)
 
-    def inspect(self, *, _current_indentation: int = 0):
+    def scan_nodes(self) -> frozenset[QueryExecutionPlan]:
+        own_node = [self] if self.is_scan else []
+        child_scans = collection_utils.flatten(child.scan_nodes() for child in self.children)
+        return frozenset(own_node + child_scans)
+
+    def join_nodes(self) -> frozenset[QueryExecutionPlan]:
+        own_node = [self] if self.is_join else []
+        child_joins = collection_utils.flatten(child.join_nodes() for child in self.children)
+        return frozenset(own_node + child_joins)
+
+    def plan_depth(self) -> int:
+        return 1 + max((child.plan_depth() for child in self.children), default=0)
+
+    def simplify(self) -> Optional[QueryExecutionPlan]:
+        if not self.is_join and not self.is_scan:
+            if len(self.children) != 1:
+                return None
+            return self.children[0].simplify()
+
+        simplified_children = [child.simplify() for child in self.children] if not self.is_scan else []
+        simplified_inner = self.inner_child.simplify() if not self.is_scan and self.inner_child else None
+        return QueryExecutionPlan(self.node_type, self.is_join, self.is_scan,
+                                  table=self.table,
+                                  children=simplified_children,
+                                  parallel_workers=self.parallel_workers,
+                                  cost=self.cost,
+                                  estimated_cardinality=self.estimated_cardinality,
+                                  true_cardinality=self.true_cardinality,
+                                  execution_time=self.execution_time,
+                                  physical_operator=self.physical_operator,
+                                  inner_child=simplified_inner)
+
+    def inspect(self, *, skip_intermediates: bool = False, _current_indentation: int = 0):
         padding = " " * _current_indentation
         prefix = f"{padding}<- " if padding else ""
         own_inspection = [prefix + str(self)]
-        child_inspections = [child.inspect(_current_indentation=_current_indentation + 2) for child in self.children]
-        return "\n".join(own_inspection + child_inspections)
+        child_inspections = [
+            child.inspect(skip_intermediates=skip_intermediates, _current_indentation=_current_indentation + 2)
+            for child in self.children]
+
+        if not skip_intermediates or self.is_join or self.is_scan or not _current_indentation:
+            return "\n".join(own_inspection + child_inspections)
+        else:
+            return "\n".join(child_inspections)
+
+    def __hash__(self) -> int:
+        return hash((self.node_type, self.table, self.true_cardinality, tuple(self.children)))
+
+    def __eq__(self, other: object) -> bool:
+        return (isinstance(other, type(self))
+                and self.node_type == other.node_type and self.table == other.table
+                and self.children == other.children and
+                (self.true_cardinality == other.true_cardinality
+                 or (math.isnan(self.true_cardinality) and math.isnan(other.true_cardinality)))
+                )
 
     def __repr__(self) -> str:
         return str(self)
@@ -646,7 +726,7 @@ class QueryExecutionPlan:
             analyze_str = ""
 
         table_str = f" :: {self.table}" if self.table else ""
-        plan_str = f" (cost={self.estimated_cost} estimated cardinality={self.estimated_cardinality})"
+        plan_str = f" (cost={self.cost} estimated cardinality={self.estimated_cardinality})"
         return "".join((self.node_type, table_str, plan_str, analyze_str))
 
 
@@ -656,6 +736,11 @@ class OptimizerInterface(abc.ABC):
     @abc.abstractmethod
     def query_plan(self, query: qal.SqlQuery | str) -> QueryExecutionPlan:
         """Obtains the query execution plan for the given query."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def analyze_plan(self, query: qal.SqlQuery) -> QueryExecutionPlan:
+        """Executes the given query and provides the query execution plan supplemented with runtime information."""
         raise NotImplementedError
 
     @abc.abstractmethod

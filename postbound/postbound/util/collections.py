@@ -11,7 +11,7 @@ ContainerType = typing.TypeVar("ContainerType", list, tuple, set, frozenset)
 
 def flatten(deep_list: Iterable[Iterable[T] | T]) -> list[T]:
     """Transforms a nested list into a flat list: `[[1, 2], [3]]` is turned into `[1, 2, 3]`"""
-    flattened = []
+    flattened: list[T] = []
     for nested in deep_list:
         if isinstance(nested, Iterable) and not isinstance(nested, str):
             flattened.extend(nested)
@@ -39,11 +39,22 @@ def enlist(obj: T | ContainerType[T], *, enlist_tuples: bool = False) -> Contain
     return [obj]
 
 
-def simplify(obj: Collection[T]) -> T | Iterable[T]:
+def get_any(elems: Iterable[T]) -> T:
+    """Provides any element from the supplied Iterable. There is no guarantee which one will be returned.
+
+    Notice that this method can potentially iterate over the entire Iterable!
+    """
+    return list(elems)[0]
+
+
+def simplify(obj: Collection[T] | T) -> T | Collection[T]:
     """Unwraps singular containers.
 
     For example `[1]` is simplified to `1`. On the other hand, `[1,2]` is returned unmodified.
     """
+    if "__len__" not in dir(obj) or "__iter__" not in dir(obj):
+        return obj
+
     if len(obj) == 1:
         return list(obj)[0]
     return obj
@@ -89,9 +100,9 @@ def pairs(lst: Iterable[T]) -> Iterable[tuple[T, T]]:
     return all_pairs
 
 
-def set_union(sets: Iterable[set | frozenset]) -> set:
+def set_union(sets: Iterable[set[T] | frozenset[T]]) -> set[T]:
     """Combines the elements of all input sets into one large set."""
-    union_set = set()
+    union_set: set[T] = set()
     for s in sets:
         union_set |= s
     return union_set

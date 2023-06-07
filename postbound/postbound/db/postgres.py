@@ -95,7 +95,7 @@ class PostgresInterface(db.Database):
         # version looks like "PostgreSQL 14.6 on x86_64-pc-linux-gnu, compiled by gcc (...)
         return utils.Version(pg_ver.split(" ")[1])
 
-    def inspect(self) -> dict:
+    def describe(self) -> dict:
         base_info = {
             "system_name": self.database_system_name(),
             "system_version": self.database_system_version(),
@@ -344,28 +344,41 @@ def _is_hash_join(join_tree_node: jointree.IntermediateJoinNode,
 def _generate_leading_hint_content(join_tree_node: jointree.AbstractJoinTreeNode,
                                    operator_assignment: Optional[physops.PhysicalOperatorAssignment] = None) -> str:
     """Builds part of the Leading hint to enforce join order and join direction for the given join node."""
-    if isinstance(join_tree_node, jointree.IntermediateJoinNode):
+    if isinstance(join_tree_node, jointree.BaseTableNode):
+        return join_tree_node.table.identifier()
+    if not isinstance(join_tree_node, jointree.IntermediateJoinNode):
+        raise ValueError(f"Unknown join tree node: {join_tree_node}")
+
+    # for Postgres, the inner relation of a Hash join is the one that gets the hash table and the outer relation is
+    # the one being probed. For all other joins, the inner/outer relation actually is the inner/outer relation
+    # Therefore, we want to have the smaller relation as the inner relation for hash joins and the other way around
+    # for all other joins
+
+    has_directional_information = isinstance(join_tree_node.annotation, physops.DirectionalJoinOperatorAssignment)
+    if has_directional_information:
+        annotation: physops.DirectionalJoinOperatorAssignment = join_tree_node.annotation
+        inner_tables = annotation.inner
+        inner_child = (join_tree_node.left_child if join_tree_node.left_child.tables() == inner_tables
+                       else join_tree_node.right_child)
+        outer_child = (join_tree_node.left_child if inner_child == join_tree_node.right_child
+                       else join_tree_node.right_child)
+        inner_child, outer_child = ((outer_child, inner_child) if annotation.operator == physops.JoinOperators.HashJoin
+                                    else (inner_child, outer_child))
+    else:
         left, right = join_tree_node.left_child, join_tree_node.right_child
-        left_hint = _generate_leading_hint_content(left, operator_assignment)
-        right_hint = _generate_leading_hint_content(right, operator_assignment)
         left_bound = left.upper_bound if left.upper_bound and not math.isnan(left.upper_bound) else -math.inf
         right_bound = right.upper_bound if right.upper_bound and not math.isnan(right.upper_bound) else math.inf
 
-        # for Postgres, the inner relation of a Hash join is the one that gets the hash table and the outer relation is
-        # the one being probed. For all other joins, the inner/outer relation actually is the inner/outer relation
-        # Therefore, we want to have the smaller relation as the inner relation for hash joins and the other way around
-        # for all other joins
-
         if _is_hash_join(join_tree_node, operator_assignment):
-            left_hint, right_hint = (left_hint, right_hint) if right_bound > left_bound else (right_hint, left_hint)
+            inner_child, outer_child = (left, right) if right_bound > left_bound else (right, left)
         elif left_bound > right_bound:
-            left_hint, right_hint = right_hint, left_hint
+            inner_child, outer_child = right, left
+        else:
+            inner_child, outer_child = left, right
 
-        return f"({left_hint} {right_hint})"
-    elif isinstance(join_tree_node, jointree.BaseTableNode):
-        return join_tree_node.table.identifier()
-    else:
-        raise ValueError(f"Unknown join tree node: {join_tree_node}")
+    inner_hint = _generate_leading_hint_content(inner_child, operator_assignment)
+    outer_hint = _generate_leading_hint_content(outer_child, operator_assignment)
+    return f"({outer_hint} {inner_hint})"
 
 
 def _generate_pg_join_order_hint(query: qal.SqlQuery,
@@ -396,7 +409,8 @@ PostgresOptimizerSettings = {
     physops.JoinOperators.SortMergeJoin: "enable_mergejoin",
     physops.ScanOperators.SequentialScan: "enable_seqscan",
     physops.ScanOperators.IndexScan: "enable_indexscan",
-    physops.ScanOperators.IndexOnlyScan: "enable_indexonlyscan"
+    physops.ScanOperators.IndexOnlyScan: "enable_indexonlyscan",
+    physops.ScanOperators.BitmapScan: "enable_bitmapscan"
 }
 """Denotes all (session-global) optimizer settings that modify the allowed physical operators."""
 
@@ -408,7 +422,8 @@ PostgresOptimizerHints = {
     physops.JoinOperators.SortMergeJoin: "MergeJoin",
     physops.ScanOperators.SequentialScan: "SeqScan",
     physops.ScanOperators.IndexScan: "IndexOnlyScan",
-    physops.ScanOperators.IndexOnlyScan: "IndexOnlyScan"
+    physops.ScanOperators.IndexOnlyScan: "IndexOnlyScan",
+    physops.ScanOperators.BitmapScan: "BitmapScan"
 }
 """Denotes all physical operators that can be enforced for individual parts of a query.
 
@@ -436,7 +451,7 @@ def _generate_pg_operator_hints(physical_operators: physops.PhysicalOperatorAssi
         hints.append(f"{scan_assignment}({table_key})")
 
     if hints:
-        hints.append("")
+        hints.append("")  # insert empty hint to force empty line between scan and join operators
     for join, join_assignment in physical_operators.join_operators.items():
         join_key = _generate_join_key(join)
         join_assignment = PostgresOptimizerHints[join_assignment.operator]
@@ -499,7 +514,7 @@ def _apply_hint_block_to_query(query: qal.SqlQuery, hint_block: Optional[clauses
 PostgresJoinHints = {physops.JoinOperators.NestedLoopJoin, physops.JoinOperators.IndexNestedLoopJoin,
                      physops.JoinOperators.HashJoin, physops.JoinOperators.SortMergeJoin}
 PostgresScanHints = {physops.ScanOperators.SequentialScan, physops.ScanOperators.IndexScan,
-                     physops.ScanOperators.IndexOnlyScan}
+                     physops.ScanOperators.IndexOnlyScan, physops.ScanOperators.BitmapScan}
 PostgresPlanHints = {planmeta.HintType.CardinalityHint, planmeta.HintType.ParallelizationHint,
                      planmeta.HintType.JoinOrderHint, planmeta.HintType.JoinDirectionHint}
 
@@ -517,6 +532,14 @@ class PostgresHintService(db.HintService):
             adapted_query, hint_parts = _generate_pg_join_order_hint(adapted_query, join_order, physical_operators)
 
         hint_parts = hint_parts if hint_parts else HintParts.empty()
+
+        physical_operators = (join_order.physical_operators()
+                              if not physical_operators and isinstance(join_order, jointree.PhysicalQueryPlan)
+                              else physical_operators)
+        plan_parameters = (join_order.plan_parameters()
+                           if not plan_parameters and isinstance(join_order, jointree.PhysicalQueryPlan)
+                           else plan_parameters)
+
         if physical_operators:
             operator_hints = _generate_pg_operator_hints(physical_operators)
             hint_parts = hint_parts.merge_with(operator_hints)
@@ -542,19 +565,29 @@ class PostgresOptimizer(db.OptimizerInterface):
         self._pg_instance = postgres_instance
 
     def query_plan(self, query: qal.SqlQuery | str) -> db.QueryExecutionPlan:
-        query = self._pg_instance._prepare_query_execution(query, drop_explain=True)
+        if isinstance(query, qal.SqlQuery):
+            query = self._pg_instance._prepare_query_execution(query, drop_explain=True)
         raw_query_plan = self._pg_instance._obtain_query_plan(query)
         query_plan = PostgresExplainPlan(raw_query_plan)
         return query_plan.as_query_execution_plan()
 
+    def analyze_plan(self, query: qal.SqlQuery) -> db.QueryExecutionPlan:
+        query = self._pg_instance._prepare_query_execution(transform.as_explain_analyze(query))
+        self._pg_instance.cursor().execute(query)
+        raw_query_plan = self._pg_instance.cursor().fetchone()[0]
+        query_plan = PostgresExplainPlan(raw_query_plan)
+        return query_plan.as_query_execution_plan()
+
     def cardinality_estimate(self, query: qal.SqlQuery | str) -> int:
-        query = self._pg_instance._prepare_query_execution(query, drop_explain=True)
+        if isinstance(query, qal.SqlQuery):
+            query = self._pg_instance._prepare_query_execution(query, drop_explain=True)
         query_plan = self._pg_instance._obtain_query_plan(query)
         estimate = query_plan[0]["Plan"]["Plan Rows"]
         return estimate
 
     def cost_estimate(self, query: qal.SqlQuery | str) -> float:
-        query = self._pg_instance._prepare_query_execution(query, drop_explain=True)
+        if isinstance(query, qal.SqlQuery):
+            query = self._pg_instance._prepare_query_execution(query, drop_explain=True)
         query_plan = self._pg_instance._obtain_query_plan(query)
         estimate = query_plan[0]["Plan"]["Total Cost"]
         return estimate
@@ -675,8 +708,13 @@ class ParallelQueryExecutor:
                 f"(run={len(running_workers)} fin={len(completed_workers)})")
 
 
-PostgresJoinNodes = {"Hash Join", "Merge Join", "Nested Loop"}
-PostgresScanNodes = {"Bitmap Heap Scan", "Index Scan", "Index Only Scan", "Seq Scan"}
+PostgresExplainJoinNodes = {"Nested Loop": physops.JoinOperators.NestedLoopJoin,
+                            "Hash Join": physops.JoinOperators.HashJoin,
+                            "Merge Join": physops.JoinOperators.SortMergeJoin}
+PostgresExplainScanNodes = {"Seq Scan": physops.ScanOperators.SequentialScan,
+                            "Index Scan": physops.ScanOperators.IndexScan,
+                            "Index Only Scan": physops.ScanOperators.IndexOnlyScan,
+                            "Bitmap Heap Scan": physops.ScanOperators.BitmapScan}
 
 
 class PostgresExplainNode:
@@ -705,17 +743,37 @@ class PostgresExplainNode:
         self.children = [PostgresExplainNode(child) for child in explain_data.get("Plans", [])]
 
     def as_query_execution_plan(self) -> db.QueryExecutionPlan:
-        child_nodes = [child.as_query_execution_plan() for child in self.children]
+        if self.children and len(self.children) > 2:
+            raise ValueError("Cannot transform parent node > 2 children")
+        elif self.children and len(self.children) == 1:
+            child_nodes = [self.children[0].as_query_execution_plan()]
+            inner_child = None
+        elif self.children:
+            first_child, second_child = self.children
+            child_nodes = [first_child.as_query_execution_plan(), second_child.as_query_execution_plan()]
+            inner_child = child_nodes[0] if first_child.parent_relationship == "Inner" else child_nodes[1]
+        else:
+            child_nodes = None
+            inner_child = None
+
         table = self._parse_table()
-        is_scan = self.node_type in PostgresScanNodes
-        is_join = self.node_type in PostgresJoinNodes
+        is_scan = self.node_type in PostgresExplainScanNodes
+        is_join = self.node_type in PostgresExplainJoinNodes
         par_workers = self.parallel_workers + 1  # in Postgres the control worker also processes input
         true_card = self.true_cardinality * self.loops
 
+        if is_scan:
+            operator = PostgresExplainScanNodes.get(self.node_type, None)
+        elif is_join:
+            operator = PostgresExplainJoinNodes.get(self.node_type, None)
+        else:
+            operator = None
+
         return db.QueryExecutionPlan(self.node_type, is_join=is_join, is_scan=is_scan, table=table,
                                      children=child_nodes, parallel_workers=par_workers,
-                                     estimated_cost=self.cost, estimated_cardinality=self.cardinality_estimate,
-                                     true_cardinality=true_card, execution_time=self.execution_time)
+                                     cost=self.cost, estimated_cardinality=self.cardinality_estimate,
+                                     true_cardinality=true_card, execution_time=self.execution_time / 1000,
+                                     physical_operator=operator, inner_child=inner_child)
 
     def _parse_table(self) -> Optional[base.TableReference]:
         if not self.relation_name:
