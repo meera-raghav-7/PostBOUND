@@ -8,9 +8,14 @@ import math
 import os
 import textwrap
 import threading
+<<<<<<< HEAD
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any, Optional
+=======
+from typing import Any
+import re
+>>>>>>> 6b934ddb0e86a3dd7e2c6532371a0c9b3447b1a7
 
 import psycopg
 import psycopg.rows
@@ -93,7 +98,11 @@ class PostgresInterface(db.Database):
         self._cursor.execute("SELECT VERSION();")
         pg_ver = self._cursor.fetchone()[0]
         # version looks like "PostgreSQL 14.6 on x86_64-pc-linux-gnu, compiled by gcc (...)
-        return utils.Version(pg_ver.split(" ")[1])
+        match = re.search(r'PostgreSQL (\d+\.\d+)', pg_ver)
+        if match:
+           return utils.Version(match.group(1))
+        else:
+           raise ValueError(f"Unable to extract version from string: {pg_ver}")
 
     def describe(self) -> dict:
         base_info = {
@@ -200,9 +209,16 @@ class PostgresSchemaInterface(db.DatabaseSchema):
         if not column.table:
             raise base.UnboundColumnError(column)
         query_template = textwrap.dedent("""
+<<<<<<< HEAD
             SELECT data_type FROM information_schema.columns
             WHERE table_name = {tab} AND column_name = {col}""".format(tab=column.table.full_name, col=column.name))
         self._db.cursor().execute(query_template)
+=======
+                        SELECT data_type FROM information_schema.columns
+                        WHERE table_name = '{tab}' AND column_name = '{col}'""")
+        datatype_query = query_template.format(tab=column.table.full_name, col=column.name)
+        self._db.cursor().execute(datatype_query)
+>>>>>>> 6b934ddb0e86a3dd7e2c6532371a0c9b3447b1a7
         result_set = self._db.cursor().fetchone()
         return result_set[0]
 
