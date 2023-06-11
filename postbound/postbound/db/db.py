@@ -258,10 +258,6 @@ class Database(abc.ABC):
 
     def __query_cache_name(self):
         """Provides a normalized file name for the query cache."""
-<<<<<<< HEAD
-=======
-        
->>>>>>> 6b934ddb0e86a3dd7e2c6532371a0c9b3447b1a7
         return f".query_cache_{self.system_name}.json"
 
     def __repr__(self) -> str:
@@ -568,7 +564,6 @@ class UnsupportedDatabaseFeatureError(RuntimeError):
         super().__init__(f"Database {database.system_name} does not support feature {feature}")
         self.database = database
         self.feature = feature
-<<<<<<< HEAD
 
 
 class DatabaseServerError(RuntimeError):
@@ -757,6 +752,3 @@ class OptimizerInterface(abc.ABC):
     def cost_estimate(self, query: qal.SqlQuery | str) -> float:
         """Queries the DBMS query optimizer for the estimated cost of executing the query."""
         raise NotImplementedError
-=======
-        
->>>>>>> 6b934ddb0e86a3dd7e2c6532371a0c9b3447b1a7

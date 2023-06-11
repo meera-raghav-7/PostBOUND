@@ -803,6 +803,7 @@ class LogicalJoinTree(JoinTree[LogicalJoinMetadata, LogicalBaseTableMetadata]):
             cardinality = query_plan.true_cardinality if query_plan.is_analyze() else query_plan.estimated_cardinality
             table_annotation = LogicalBaseTableMetadata(filter_predicate, cardinality)
             return current_join_tree.join_with_base_table(table, table_annotation)
+        
         elif query_plan.is_join:
             if len(query_plan.children) != 2:
                 raise ValueError(f"Join nodes must have exactly two child nodes: {query_plan}")

@@ -8,14 +8,10 @@ import math
 import os
 import textwrap
 import threading
-<<<<<<< HEAD
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any, Optional
-=======
-from typing import Any
 import re
->>>>>>> 6b934ddb0e86a3dd7e2c6532371a0c9b3447b1a7
 
 import psycopg
 import psycopg.rows
@@ -209,16 +205,9 @@ class PostgresSchemaInterface(db.DatabaseSchema):
         if not column.table:
             raise base.UnboundColumnError(column)
         query_template = textwrap.dedent("""
-<<<<<<< HEAD
             SELECT data_type FROM information_schema.columns
             WHERE table_name = {tab} AND column_name = {col}""".format(tab=column.table.full_name, col=column.name))
         self._db.cursor().execute(query_template)
-=======
-                        SELECT data_type FROM information_schema.columns
-                        WHERE table_name = '{tab}' AND column_name = '{col}'""")
-        datatype_query = query_template.format(tab=column.table.full_name, col=column.name)
-        self._db.cursor().execute(datatype_query)
->>>>>>> 6b934ddb0e86a3dd7e2c6532371a0c9b3447b1a7
         result_set = self._db.cursor().fetchone()
         return result_set[0]
 

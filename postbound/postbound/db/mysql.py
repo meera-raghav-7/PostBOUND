@@ -6,6 +6,8 @@ import dataclasses
 import json
 import os
 import textwrap
+import math
+import numbers
 from collections.abc import Sequence,Iterable
 import sys
 from dataclasses import dataclass
@@ -74,19 +76,22 @@ class MysqlInterface(db.Database):
         if cache_enabled and query in self._query_cache:
             query_result = self._query_cache[query]
         else:
+            
             self._cur.execute(query)
-            query_result = self._cur.fetchall()
+            query_result = self._cur.fetchall() if self._cur else []
             if cache_enabled:
                 self._query_cache[query] = query_result
+            
 
-        # simplify the query result as much as possible: [(42, 24)] becomes (42, 24) and [(1,), (2,)] becomes [1, 2]
-        # [(42, 24), (4.2, 2.4)] is left as-is
+    # Simplify the query result as much as possible: [(42, 24)] becomes (42, 24) and [(1,), (2,)] becomes [1, 2]
+    # [(42, 24), (4.2, 2.4)] is left as-is
         if not query_result:
-            return []
-        result_structure = query_result[0]  # what do the result tuples look like?
-        if len(result_structure) == 1:  # do we have just one column?
-            query_result = [row[0] for row in query_result]  # if it is just one column, unwrap it
-        return query_result if len(query_result) > 1 else query_result[0]  # if it is just one row, unwrap it
+           return []
+        result_structure = query_result[0]  # What do the result tuples look like?
+        if len(result_structure) == 1:  # Do we have just one column?
+            query_result = [row[0] for row in query_result]  # If it is just one column, unwrap it
+        return query_result if len(query_result) > 1 else query_result[0]  # If it is just one row, unwrap it
+
 
     def cardinality_estimate(self, query: qal.SqlQuery | str) -> int:
         query = self._prepare_query_execution(query, drop_explain=True)
@@ -285,7 +290,7 @@ MysqlPlanHints = {planmeta.HintType.JoinOrderHint}
 
 @dataclass
 class HintParts:
-    """Captures the different kinds of Postgres-hints to collect them more easily."""
+    """Captures the different kinds of hints to collect them more easily."""
     settings: list[str]
     hints: list[str]
 
@@ -302,6 +307,49 @@ class HintParts:
         merged_settings = self.settings + [setting for setting in other.settings if setting not in self.settings]
         merged_hints = self.hints + [hint for hint in other.hints if hint not in self.hints]
         return HintParts(merged_settings, merged_hints)
+    
+def _generate_straight_join_hint_content(join_tree_node: jointree.AbstractJoinTreeNode,
+                                   operator_assignment: Optional[physops.PhysicalOperatorAssignment] = None) -> str:
+    """Builds part of the Leading hint to enforce join order and join direction for the given join node."""
+    if isinstance(join_tree_node, jointree.BaseTableNode):
+        return join_tree_node.table.identifier()
+    if not isinstance(join_tree_node, jointree.IntermediateJoinNode):
+        raise ValueError(f"Unknown join tree node: {join_tree_node}")
+    
+    has_directional_information = isinstance(join_tree_node.annotation, physops.DirectionalJoinOperatorAssignment)
+    if has_directional_information:
+        annotation: physops.DirectionalJoinOperatorAssignment = join_tree_node.annotation
+        inner_tables = annotation.inner
+        inner_child = (join_tree_node.left_child if join_tree_node.left_child.tables() == inner_tables
+                       else join_tree_node.right_child)
+        outer_child = (join_tree_node.left_child if inner_child == join_tree_node.right_child
+                       else join_tree_node.right_child)
+        inner_child, outer_child = inner_child, outer_child
+        
+    else:
+        left, right = join_tree_node.left_child, join_tree_node.right_child
+        left_bound = left.upper_bound if left.upper_bound and not math.isnan(left.upper_bound) else -math.inf
+        right_bound = right.upper_bound if right.upper_bound and not math.isnan(right.upper_bound) else math.inf
+
+        if left_bound > right_bound:
+            inner_child, outer_child = right, left
+        else:
+            inner_child, outer_child = left, right
+
+    inner_hint = _generate_straight_join_hint_content(inner_child, operator_assignment)
+    outer_hint = _generate_straight_join_hint_content(outer_child, operator_assignment)
+    return f"({outer_hint} {inner_hint})"
+
+def _generate_mysql_join_order_hint(query: qal.SqlQuery,
+                                 join_order: jointree.LogicalJoinTree | jointree.PhysicalQueryPlan,
+                                 operator_assignment: Optional[physops.PhysicalOperatorAssignment] = None
+                                 ) -> tuple[qal.SqlQuery, Optional[HintParts]]:
+    if len(join_order) < 2:
+        return query, None
+    straight_join = _generate_straight_join_hint_content(join_order.root, operator_assignment)
+    straight_join = f"STRAIGHT_JOIN({straight_join})"
+    hints = HintParts([], [straight_join])
+    return query, hints
 
 def _generate_join_key(tables: Iterable[base.TableReference]) -> str:
     """Builds a MySQL-compatible identifier for the join consisting of the given tables."""
@@ -312,13 +360,20 @@ def _generate_join_key(tables: Iterable[base.TableReference]) -> str:
 def _generate_mysql_operator_hints(physical_operators: physops.PhysicalOperatorAssignment) -> HintParts:
     """Generates the hints and preparatory statements to enforce the selected optimization ."""
     settings = []
+    operators = []
+
+# Add operators to the list
     for operator, enabled in physical_operators.global_settings.items():
         if enabled is None:
-            setting = "default"
+           setting = "default"
         else:
-            setting = "on" if enabled else "off"
-        operator_key = MysqlOptimizerSettings[operator]
-        settings.append(f"SET optimizer_switch='{operator_key}={setting}';")
+           setting = "on" if enabled else "off"
+           operator_key = MysqlOptimizerSettings[operator]
+           operators.append(f"{operator_key}={setting}")
+
+# Generate the optimizer_switch statement
+    if operators:
+       settings.append(f"SET optimizer_switch='{','.join(operators)}';")
 
     hints = []
     for table, scan_assignment in physical_operators.scan_operators.items():
@@ -343,15 +398,6 @@ def _generate_mysql_index_hints(plan_parameters: planmeta.PlanParameterization) 
     hints, settings = [], []
 
     
-    for table, index_list in plan_parameters.index_hints.items():
-        for index in index_list:
-            if table:
-                index = ", ".join(index_list)
-                hints.append(f"FORCE_INDEX({table.identifier()} {index})")
-                break  
-            else:
-                hints.append(f"FORCE_INDEX({', '.join(index_list)})")
-                break
     
     for tables in plan_parameters.join_order_hints.keys():
         hint = ', '.join(table.identifier() for table in tables)
@@ -361,7 +407,29 @@ def _generate_mysql_index_hints(plan_parameters: planmeta.PlanParameterization) 
 
     return HintParts(settings, hints)    
 
+def modify_str_methods():
+    """ used to modify standard SQL statements that differ from usual standards accomodate it to MYSQL""" 
+    cast_exp = expressions.CastExpression.__str__
+    exp_method = clauses.Explain.__str__
     
+    def typecasting(cast_exp) -> str:
+        return f" CAST({cast_exp.casted_expression} AS {cast_exp.target_type})"
+    
+    def modified_explain_str(exp_method) -> str:
+        explain_prefix = "EXPLAIN"
+        explain_body = ""
+        if exp_method.analyze and exp_method.target_format:
+            explain_body = f" ANALYZE "
+        elif exp_method.analyze:
+            explain_body = " ANALYZE"
+        elif exp_method.target_format:
+            explain_body = f" FORMAT = {exp_method.target_format}"
+        return explain_prefix + explain_body
+    
+        
+    expressions.CastExpression.__str__ = typecasting
+    clauses.Explain.__str__ = modified_explain_str
+    return cast_exp,exp_method   
 
 def _generate_hint_block(parts: HintParts) -> Optional[clauses.Hint]:
     """Constructs the hint block for the given hint parts"""
@@ -370,54 +438,71 @@ def _generate_hint_block(parts: HintParts) -> Optional[clauses.Hint]:
         return None
     settings_block = "\n".join(settings)
     hints_block = "\n".join(["/*+"] + ["  " + hint for hint in hints] + ["*/"]) if hints else ""
-    return clauses.Hint(settings_block, hints_block)
+    return clauses.Hint(preparatory_statements=settings_block, query_hints=hints_block)
 
+
+def hints_modification():
+    original_str_method = clauses.Select.__str__
+
+    def modified_str_method(original_str_method) -> str:
+        select_str = original_str_method.projection_type.value
+        parts_str = " ".join(str(target) for target in original_str_method.targets)
+        return f"{select_str} {parts_str}"
+
+    clauses.Select.__str__ = modified_str_method
+    return original_str_method
 
 def _apply_hint_block_to_query(query: qal.SqlQuery, hint_block: Optional[clauses.Hint]) -> qal.SqlQuery:
-    """Generates a new query with the given hint block."""
-    return transform.add_clause(query, hint_block) if hint_block else query
+    """Applies a hint block to the given query by adding the hint block before the SELECT clause."""
+    if hint_block is None:
+        return query
+    # Get the original SELECT clause
+    
+    select_clause = query.select_clause
+    hints_modification()
+    # Create a new SELECT clause with the hint block as a comment before the original SELECT clause
+    hints = hint_block.query_hints
 
-def modify_str_methods():
-    string_method = expressions.StaticValueExpression.__str__
-    cast_exp = expressions.CastExpression.__str__
-    exp_method = clauses.Explain.__str__
-    def typecasting(cast_expression):
-        if type(cast_expression) == expressions.CastExpression:
-            sys.exit("MySQL doesn't support type casting.")
+    new_targets = [f"{hints}"] + list(select_clause.targets)
+    new_select_clause = clauses.Select(new_targets, select_clause.projection_type)
+    # Create a new query with the modified SELECT clause
+    replaced_query = transform.replace_clause(query, new_select_clause)
 
-    def double_quotes(expression):
-        if type(expression) == expressions.StaticValueExpression and type(expression.value) == str:
-            return f'"{expression.value}"'
-        return string_method(expression)
+    settings_block = hint_block.preparatory_statements
+    if settings_block is not None:
+        new_hint_block = clauses.Hint(preparatory_statements=settings_block)
+        return transform.add_clause(replaced_query, new_hint_block)
     
-    def modified_explain_str(exp_method) -> str:
-            explain_prefix = "EXPLAIN"
-            explain_body = ""
-            if exp_method.analyze and exp_method.target_format:
-                explain_body = f" FORMAT = {exp_method.target_format}"
-            elif exp_method.analyze:
-                explain_body = " ANALYZE"
-            elif exp_method.target_format:
-                explain_body = f" FORMAT = {exp_method.target_format}"
-            return explain_prefix + explain_body
+    return replaced_query
     
-    expressions.CastExpression.__str__ = typecasting
-    expressions.StaticValueExpression.__str__ = double_quotes
-    clauses.Explain.__str__ = modified_explain_str
-    
-    return string_method, cast_exp,exp_method
 
 class MysqlHintService(db.HintService):
 
+    modify_str_methods()
+
+   
 
     def generate_hints(self, query: qal.SqlQuery,
                        join_order: Optional[jointree.LogicalJoinTree | jointree.PhysicalQueryPlan] = None,
                        physical_operators: Optional[physops.PhysicalOperatorAssignment] = None,
                        plan_parameters: Optional[planmeta.PlanParameterization] = None) -> qal.SqlQuery:
         
-        join_order
+        adapted_query = query
         hint_parts = None
+
+        if join_order:
+            adapted_query, hint_parts = _generate_mysql_join_order_hint(adapted_query, join_order, physical_operators)
+
         hint_parts = hint_parts if hint_parts else HintParts.empty()
+        
+        physical_operators = (join_order.physical_operators()
+                              if not physical_operators and isinstance(join_order, jointree.PhysicalQueryPlan)
+                              else physical_operators)
+        plan_parameters = (join_order.plan_parameters()
+                           if not plan_parameters and isinstance(join_order, jointree.PhysicalQueryPlan)
+                           else plan_parameters)
+        
+        
         if physical_operators:
             operator_hints = _generate_mysql_operator_hints(physical_operators)
             hint_parts = hint_parts.merge_with(operator_hints)
@@ -428,16 +513,11 @@ class MysqlHintService(db.HintService):
 
 
         hint_block = _generate_hint_block(hint_parts)
-        query = _apply_hint_block_to_query(query, hint_block)
-        return query
+        adapted_query = _apply_hint_block_to_query(adapted_query, hint_block)
+        return adapted_query
 
     def format_query(self, query: qal.SqlQuery) -> str:
-        
-        string_method, cast_exp,exp_method  = modify_str_methods()
-        query = formatter.format_quick(query)
-        expressions.StaticValueExpression.__str__ = string_method
-        expressions.CastExpression.__str__ = cast_exp
-        clauses.Explain.__str__ = exp_method
+        query = formatter.format_quick(query) 
         return query
         
     
@@ -493,237 +573,3 @@ def connect(*, name: str = "mysql", connection_args: Optional[MysqlConnectionArg
     if not private:
         db_pool.register_database(name, mysql_db)
     return mysql_db
-
-from __future__ import annotations
-import json
-import collections
-import concurrent
-import concurrent.futures
-import os
-import textwrap
-import threading
-import re
-from typing import Any
-
-
-import mysql.connector
-
-
-from postbound.db import db
-from postbound.qal import qal, base, transform
-from postbound.util import logging, misc as utils
-
-
-class mysqlInterface(db.Database):
-    
-    def __init__(self, connect_string: dict[str, Any],system_name: str = "MYSQL",  *, cache_enabled: bool = True) -> None:
-       
-        self.connect_string = connect_string
-        
-        self._connection = mysql.connector.connect(**connect_string)
-        self._connection.autocommit = True
-        self._cursor = self._connection.cursor()
-       
-        self._db_schema = mysqlSchemaInterface(self)
-        self._db_stats = mysqlStatisticsInterface(self)
-
-        super().__init__(system_name, cache_enabled=cache_enabled)
-
-    def schema(self) -> db.DatabaseSchema:
-        return self._db_schema
-    
-    def statistics(self, emulated: bool | None = None, cache_enabled: bool | None = None) -> db.DatabaseStatistics:
-        if emulated is not None:
-            self._db_stats.emulated = emulated
-        if cache_enabled is not None:
-            self._db_stats.cache_enabled = cache_enabled
-        return self._db_stats
-        
-
-    def execute_query(self, query: qal.SqlQuery | str, *, cache_enabled: bool | None = None) -> Any:
-        cache_enabled = cache_enabled or (cache_enabled is None and self._cache_enabled)
-
-        if isinstance(query, qal.SqlQuery):
-            if query.hints and query.hints.preparatory_statements:
-                self._cursor.execute(query.hints.preparatory_statements)
-            query = transform.drop_hints(query, preparatory_statements_only=True)
-            query = str(query)
-
-        if cache_enabled and query in self._query_cache:
-            query_result = self._query_cache[query]
-        else:
-            self._cursor.execute(query)
-            query_result = self._cursor.fetchall()
-            if cache_enabled:
-                self._query_cache[query] = query_result
-
-        
-        if not query_result:
-            return []
-        result_structure = query_result[0]  
-        if len(result_structure) == 1:  
-            query_result = [row[0] for row in query_result]  
-        return query_result if len(query_result) > 1 else query_result[0]
-    
-    def cardinality_estimate(self, query: qal.SqlQuery | str) -> int:
-        query = str(query)
-        if not query.upper().startswith("EXPLAIN FORMAT=JSON"):
-            query = "EXPLAIN FORMAT=JSON " + query
-        self._cursor.execute(query)
-        query_plan_json = self._cursor.fetchone()[0]
-        query_plan = json.loads(query_plan_json)
-        query_block = query_plan.get("query_block")
-        if query_block and "table" in query_block:
-            estimate = int(query_block["table"]["rows_examined_per_scan"])
-        else:
-            estimate = 1
-        return estimate
-    
-    
-   
-    
-    def database_name(self) -> None:
-        self._cursor.execute("SELECT DATABASE();")
-        db_name = self._cursor.fetchone()[0]
-        return db_name
-        
-    
-    def database_system_version(self) -> utils.Version:
-        self._cursor.execute("SELECT VERSION();")
-        mysql_ver = self._cursor.fetchone()[0]
-        # version looks like "8.0.32"
-        return utils.Version(str(mysql_ver))
-
-        
-            
-
-    def reset_connection(self) -> None:
-        self._cursor.close()
-        self._connection.rollback()
-        self._cursor = self._connection.cursor()
-
-    def cursor(self) -> db.Cursor:
-        return self._cursor
-
-    def close(self) -> None:
-        self._cursor.close()
-        self._connection.close()
-
-
-class mysqlSchemaInterface(db.DatabaseSchema):
-    """Schema-specific parts of the general MYSQL interface."""
-
-    def __init__(self, mysql_db: mysqlInterface) -> None:
-        super().__init__(mysql_db)
-
-    def lookup_column(self, column: base.ColumnReference,
-                      candidate_tables: list[base.TableReference]) -> base.TableReference:
-        for table in candidate_tables:
-            table_columns = self._fetch_columns(table)
-            if column.name in table_columns:
-                return table
-        candidate_tables = [table.full_name for table in candidate_tables]
-        raise ValueError("Column '{}' not found in candidate tables {}".format(column.name, candidate_tables))
-    
-    def is_primary_key(self, column: base.ColumnReference) -> bool:
-        if not column.table:
-            raise base.UnboundColumnError(column)
-        index_map = self._fetch_indexes(column.table)
-        return index_map.get(column.name, False)
-    
-    def has_secondary_index(self, column: base.ColumnReference) -> bool:
-        if not column.table:
-            raise base.UnboundColumnError(column)
-        index_map = self._fetch_indexes(column.table)
-        return not index_map.get(column.name, True)
-    
-    def datatype(self, column: base.ColumnReference) -> str:
-        if not column.table:
-            raise base.UnboundColumnError(column)
-        query_template = textwrap.dedent("""
-                        SELECT data_type FROM information_schema.columns
-                        WHERE BINARY table_name = '{tab}' AND BINARY column_name = '{col}'""")
-        query_template = query_template.strip()
-        datatype_query = query_template.format(tab=column.table.full_name, col=column.name)
-        self._db.cursor().execute(datatype_query)
-        result_set = self._db.cursor().fetchone()
-        return result_set[0]
-    
-    def _fetch_indexes(self, table: base.TableReference) -> dict[str, bool]:
-
-        index_query = textwrap.dedent(f""" SELECT COLUMN_NAME AS attname,  CASE WHEN COLUMN_KEY = 'PRI' THEN 'true' ELSE 'false' END AS indisprimary 
-                                           FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{table.full_name}' 
-                                           AND (COLUMN_NAME IN (SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.STATISTICS 
-                                           WHERE  TABLE_NAME = '{table.full_name}'
-                                           AND INDEX_NAME = 'PRIMARY') OR COLUMN_KEY = 'MUL'); """)
-        index_query = index_query.strip()
-        
-        cursor = self._db.cursor()
-        cursor.execute(index_query)
-        result_set = cursor.fetchall()
-        index_map = {}
-        for row in result_set:
-            col_name, has_secondary_index = row
-            index_map[col_name] = has_secondary_index == 'true'
-        return index_map
-    
-    def _fetch_columns(self, table: base.TableReference) -> list[str]:
-        """Retrieves all physical columns for a given table from the MYSQL metadata catalogs."""
-        query_template = "SELECT column_name FROM information_schema.columns WHERE BINARY table_name = %s"
-        self._db.cursor().execute(query_template, (table.full_name,))
-        result_set = self._db.cursor().fetchall()
-        return [col[0] for col in result_set]
-    
-
- 
-
-class mysqlStatisticsInterface(db.DatabaseStatistics):
-    """Statistics-specific parts of the MYSQL interface."""
-
-    def __init__(self, mysql_db: mysqlInterface) -> None:
-        super().__init__(mysql_db)    
-    
-    def _retrieve_total_rows_from_stats(self, table: base.TableReference) -> int:
-        count_query = f"SELECT TABLE_ROWS  FROM INFORMATION_SCHEMA.TABLES WHERE BINARY TABLE_NAME = '{table.full_name}'"
-        self._db.cursor().execute(count_query)
-        count = self._db.cursor().fetchone()[0]
-        return count
-    
-    def _retrieve_distinct_values_from_stats(self, column: base.ColumnReference) -> int:
-        dist_query = "SELECT DISTINCTROW CARDINALITY FROM information_schema.statistics WHERE BINARY table_name = %s AND BINARY column_name = %s"
-        self._db.cursor().execute(dist_query, (column.table.full_name, column.name))
-        dist_values = self._db.cursor().fetchone()[0]
-        return dist_values
-        
-    
-    def _retrieve_min_max_values_from_stats(self, column: base.ColumnReference) -> tuple:
-        if not self.enable_emulation_fallback:
-            raise db.UnsupportedDatabaseFeatureError(self._db, "min/max value statistics")
-        return self._calculate_min_max_values(column, cache_enabled=True)
-    
-    def _retrieve_most_common_values_from_stats(self, column: base.ColumnReference, k: int) -> list:
-        return self._calculate_most_common_values(column, k)
-    
-
-    
-
-    
-    
-    
-def connect(*, name: str = "mysql", connect_string: str | None = None, config_file: str | None = ".mysql_connection", cache_enabled: bool = True, private: bool = False) -> mysqlInterface:
-   
-    db_pool = db.DatabasePool.get_instance()
-    if config_file and not connect_string:
-        if not os.path.exists(config_file):
-            raise ValueError("Config file was given, but does not exist: " + config_file)
-        with open(config_file, "r") as f:
-            connect_string = f.readline().strip()
-    elif not connect_string:
-        raise ValueError("Connect string or config file are required to connect to MYSQL")
-
-    mysql_db = mysqlInterface(connect_string, system_name=name, cache_enabled=cache_enabled)
-    if not private:
-        db_pool.register_database(name, mysql_db)
-    
-    return mysql_db
-    

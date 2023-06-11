@@ -349,7 +349,7 @@ class Select(BaseClause):
 
     def __str__(self) -> str:
         select_str = self.projection_type.value
-        parts_str = ", ".join(str(target) for target in self.targets)
+        parts_str = ",".join(str(target) for target in self.targets)
         return f"{select_str} {parts_str}"
 
 

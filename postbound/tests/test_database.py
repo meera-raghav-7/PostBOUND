@@ -86,7 +86,3 @@ class TestDatabase(unittest.TestCase):
         self.pg_connection.close()
         self.mysql_cursor.close()
         self.mysql_connection.close()
-<<<<<<< HEAD:postbound/tests/test_database.py
-=======
-
->>>>>>> 6b934ddb0e86a3dd7e2c6532371a0c9b3447b1a7:postbound/postbound/tests/test_database.py

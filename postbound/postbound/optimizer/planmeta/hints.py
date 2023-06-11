@@ -26,7 +26,7 @@ class PlanParameterization:
         self.cardinality_hints: dict[frozenset[base.TableReference], int | float] = {}
         self.parallel_worker_hints: dict[frozenset[base.TableReference], int] = {}
         self.system_specific_settings: dict[str, Any] = {}
-        self.index_hints: dict[base.TableReference, list[str]] = {}
+        
         self.join_order_hints: dict[base.TableReference] = {}
 
         
@@ -62,14 +62,7 @@ class PlanParameterization:
         else:
             self.system_specific_settings |= kwargs
 
-    def add_index_hint(self, table: base.TableReference, index_list: Iterable[Union[str, base.ColumnReference]]) -> None:
-        """Assigns the given index hint for the table."""
-        if table:
-            if table not in self.index_hints:
-                self.index_hints[table] = []
-            self.index_hints[table].extend(index_list)
-        else:
-            self.index_hints[None] = list(index_list)
+    
     
     def add_join_order_hint(self,tables: Iterable[base.TableReference]) -> None:
     
@@ -88,8 +81,7 @@ class PlanParameterization:
         merged_params.parallel_worker_hints = self.parallel_worker_hints | other_parameters.parallel_worker_hints
         merged_params.system_specific_settings = (self.system_specific_settings
                                                   | other_parameters.system_specific_settings)
-        
-        merged_params.index_hints = self.index_hints | other_parameters.index_hints
+
         merged_params.join_order_hints = self.join_order_hints | other_parameters.join_order_hints
         
         return merged_params
