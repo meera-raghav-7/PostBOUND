@@ -114,6 +114,7 @@ class MysqlInterface(db.Database):
         db_name = self._cur.fetchone()[0]
         return db_name
 
+
     def database_system_version(self) -> misc.Version:
         self._cur.execute("SELECT VERSION();")
         version = self._cur.fetchone()[0]
