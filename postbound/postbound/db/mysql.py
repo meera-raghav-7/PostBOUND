@@ -479,9 +479,11 @@ def _apply_hint_block_to_query(query: qal.SqlQuery, hint_block: Optional[clauses
 
 class MysqlHintService(db.HintService):
 
-    modify_str_methods()
+    
 
-   
+    
+
+    modify_str_methods() 
 
     def generate_hints(self, query: qal.SqlQuery,
                        join_order: Optional[jointree.LogicalJoinTree | jointree.PhysicalQueryPlan] = None,
