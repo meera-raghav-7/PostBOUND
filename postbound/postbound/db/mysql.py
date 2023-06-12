@@ -481,7 +481,7 @@ class MysqlHintService(db.HintService):
 
     
 
-    
+    """ this is hint generation and supporting method for MYSQL"""
 
     modify_str_methods() 
 
